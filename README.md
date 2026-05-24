@@ -220,13 +220,3 @@ Because Tox'sCraft doesn't play around with the survival loop:
 **MIT License** — take it, fork it, build on it, just don't be weird about it. ✌️
 
 ---
-
-<div align="center">
-
-### 🤖 Made with [Antigravity IDE](https://antigravity.dev/) powered by Google DeepMind
-
-*Crafted with ❤️, chaos, and an unhealthy amount of voxel math.*
-
-**Tox'sCraft** — *W game. Certified bussin. No cap forever.* 🔥🪨🌲
-
-</div>
