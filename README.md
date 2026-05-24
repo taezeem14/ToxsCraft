@@ -148,7 +148,7 @@ npm install -g pnpm
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/YOUR_USERNAME/ToxsCraft.git
+git clone https://github.com/taezeem14/ToxsCraft.git
 cd ToxsCraft
 
 # 2. Install dependencies (pnpm goes brrr 🚀)
@@ -182,7 +182,7 @@ pnpm preview
 
 Tox'sCraft is fully optimized for **Vercel** deployment. It's literally a static Vite build — zero backend, zero server, zero drama.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/YOUR_USERNAME/ToxsCraft)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/taezeem14/ToxsCraft)
 
 **Manual deploy:**
 
