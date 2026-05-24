@@ -207,8 +207,12 @@ export class Game {
       // Load/Generate the center chunk fully first
       await this.preloadSpawnChunks(spawnX, spawnZ);
 
-      // Find surface y
-      while (spawnY > 0 && this.chunkManager.getBlock(spawnX, spawnY, spawnZ) === 0) {
+      // Find surface y - skip water (id 8 and 9)
+      while (spawnY > 0) {
+        const blockId = this.chunkManager.getBlock(spawnX, spawnY, spawnZ);
+        if (blockId !== 0 && blockId !== 8 && blockId !== 9) {
+          break;
+        }
         spawnY--;
       }
 
