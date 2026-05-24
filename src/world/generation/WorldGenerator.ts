@@ -88,7 +88,7 @@ export class WorldGenerator {
           } else if (y === finalHeight) {
             // Surface block (grass/sand)
             // If below sea level, it might need to be sand/gravel
-            if (y <= seaLevel + 1 && biome.id !== 2) {
+            if (y <= seaLevel + 1 && biome.id !== 2 && biome.id !== 9 && biome.id !== 10) {
               chunk.setBlock(x, y, z, 4); // Sand at water borders
             } else {
               chunk.setBlock(x, y, z, biome.surfaceBlock);
@@ -190,7 +190,7 @@ export class WorldGenerator {
         if (height <= seaLevel + 1) continue; // Skip underwater or shoreline
 
         const surfaceBlock = chunk.getBlock(x, height, z);
-        if (surfaceBlock !== 3 && surfaceBlock !== 22 && surfaceBlock !== 4) continue; // Must be grass, snowy grass, or sand
+        if (surfaceBlock !== 3 && surfaceBlock !== 22 && surfaceBlock !== 4 && surfaceBlock !== 65) continue; // Must be grass, snowy grass, sand, or mycelium
 
         // Try spawning a tree
         if (Math.random() < biome.treeChance) {
@@ -200,6 +200,12 @@ export class WorldGenerator {
             for (let cy = 1; cy <= cHeight; cy++) {
               chunk.setBlock(x, height + cy, z, 46); // Cactus
             }
+          } else if (biome.id === 10) {
+            // Mushroom Island giant mushroom spawn
+            this.drawGiantMushroom(chunk, x, height + 1, z);
+          } else if (biome.id === 8) {
+            // Savanna acacia tree spawn
+            this.drawAcaciaTree(chunk, x, height + 1, z);
           } else {
             // Standard wood tree spawn
             this.drawTree(chunk, x, height + 1, z, biome.treeType);
@@ -217,6 +223,8 @@ export class WorldGenerator {
           } else if (biome.id === 3) { // Tundra
             detailBlock = 0; // No foliage on snow
           } else if (biome.id === 7) { // Swamp
+            detailBlock = detailRand > 0.5 ? 44 : 45; // Mushrooms
+          } else if (biome.id === 10) { // Mushroom Island
             detailBlock = detailRand > 0.5 ? 44 : 45; // Mushrooms
           } else {
             if (detailRand > 0.85) {
@@ -269,6 +277,122 @@ export class WorldGenerator {
           if (existingBlock === 0) {
             chunk.setBlock(rx, ry, rz, leavesBlockId);
           }
+        }
+      }
+    }
+  }
+
+  /**
+   * Draw procedurally shaped acacia tree in Savanna
+   */
+  private drawAcaciaTree(chunk: Chunk, tx: number, ty: number, tz: number): void {
+    const height = Math.floor(Math.random() * 2) + 5; // 5 to 6 tall
+    const logId = 70; // Acacia Log
+    const leavesId = 71; // Acacia Leaves
+
+    // Base straight trunk
+    const straightHeight = 3;
+    for (let y = 0; y < straightHeight; y++) {
+      chunk.setBlock(tx, ty + y, tz, logId);
+    }
+
+    const branchHeight = height - straightHeight;
+
+    // Branch 1 (Main slant)
+    let bx1 = tx;
+    let bz1 = tz;
+    for (let y = 0; y < branchHeight; y++) {
+      const cy = ty + straightHeight + y;
+      if (y > 0) {
+        bx1 += 1;
+        bz1 += 1;
+      }
+      chunk.setBlock(bx1, cy, bz1, logId);
+    }
+    this.drawFlatCanopy(chunk, bx1, ty + height, bz1, leavesId, 2);
+
+    // Branch 2 (Side branch)
+    let bx2 = tx;
+    let bz2 = tz;
+    for (let y = 0; y < branchHeight - 1; y++) {
+      const cy = ty + straightHeight + y;
+      if (y > 0) {
+        bx2 -= 1;
+        bz2 -= 1;
+      }
+      chunk.setBlock(bx2, cy, bz2, logId);
+    }
+    if (branchHeight > 1) {
+      this.drawFlatCanopy(chunk, bx2, ty + straightHeight + branchHeight - 1, bz2, leavesId, 2);
+    }
+  }
+
+  private drawFlatCanopy(chunk: Chunk, cx: number, cy: number, cz: number, leavesId: number, radius: number): void {
+    for (let dz = -radius; dz <= radius; dz++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (Math.abs(dx) === radius && Math.abs(dz) === radius) continue;
+        
+        const rx = cx + dx;
+        const rz = cz + dz;
+        
+        for (let dy = 0; dy <= 1; dy++) {
+          const ry = cy + dy;
+          const current = chunk.getBlock(rx, ry, rz);
+          if (current === 0) {
+            chunk.setBlock(rx, ry, rz, leavesId);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Draw giant mushrooms in Mushroom Island (dome for red, plate for brown)
+   */
+  private drawGiantMushroom(chunk: Chunk, tx: number, ty: number, tz: number): void {
+    const isRed = Math.random() > 0.5;
+    const height = Math.floor(Math.random() * 3) + 5; // 5 to 7 tall stem
+    const stemId = 69; // Mushroom Stem
+    const capId = isRed ? 67 : 68; // Red or Brown Mushroom Block
+
+    // 1. Draw stem
+    for (let y = 0; y < height; y++) {
+      chunk.setBlock(tx, ty + y, tz, stemId);
+    }
+
+    const capY = ty + height;
+
+    if (isRed) {
+      // Red Mushroom Cap: Dome shape
+      // Layer 0 (top): 3x3 red cap
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          chunk.setBlock(tx + dx, capY + 2, tz + dz, capId);
+        }
+      }
+      // Layer 1 (middle): 5x5 red cap with cut corners
+      for (let dz = -2; dz <= 2; dz++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
+          chunk.setBlock(tx + dx, capY + 1, tz + dz, capId);
+        }
+      }
+      // Layer 2 (bottom): 5x5 outline/ring with cut corners
+      for (let dz = -2; dz <= 2; dz++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          if (Math.abs(dx) === 2 || Math.abs(dz) === 2) {
+            if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
+            chunk.setBlock(tx + dx, capY, tz + dz, capId);
+          }
+        }
+      }
+    } else {
+      // Brown Mushroom Cap: Flat plate
+      // 5x5 flat cap, corners cut off
+      for (let dz = -2; dz <= 2; dz++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
+          chunk.setBlock(tx + dx, capY, tz + dz, capId);
         }
       }
     }

@@ -20,6 +20,7 @@ import { createItemStack } from './inventory/ItemStack';
 import { AssetLoader } from './core/AssetLoader';
 import { MobManager } from './mobs/MobManager';
 import { settingsManager } from './core/SettingsManager';
+import { AchievementManager } from './core/AchievementManager';
 
 // Helper mapping inventory item IDs to block placement IDs
 const BLOCK_PLACEMENT_MAP: { [key: string]: number } = {
@@ -54,7 +55,14 @@ const BLOCK_PLACEMENT_MAP: { [key: string]: number } = {
   "pumpkin": 56,
   "tnt": 59,
   "ladder": 62,
-  "cobweb": 63
+  "cobweb": 63,
+  "mycelium": 65,
+  "terracotta": 66,
+  "red_mushroom_block": 67,
+  "brown_mushroom_block": 68,
+  "mushroom_stem": 69,
+  "acacia_log": 70,
+  "acacia_leaves": 71
 };
 
 export class Game {
@@ -143,6 +151,13 @@ export class Game {
         this.togglePause();
       }
     });
+
+    eventBus.on('inventory_update', () => {
+      if (this.player) {
+        const slots = this.player.inventory.getSlots();
+        AchievementManager.getInstance().checkAchievements(slots);
+      }
+    });
   }
 
   /**
@@ -168,14 +183,22 @@ export class Game {
       this.dayNightCycle.setTime(savedPlayer.timeOfDay);
       this.dayNightCycle.setDaysElapsed(savedPlayer.daysElapsed);
       
+      this.player.level = savedPlayer.level !== undefined ? savedPlayer.level : 1;
+      this.player.xp = savedPlayer.xp !== undefined ? savedPlayer.xp : 0;
+
       // Deserialize slots
-      for (let i = 0; i < 36; i++) {
-        const item = savedPlayer.inventory[i];
+      const savedInv = savedPlayer.inventory || [];
+      for (let i = 0; i < 50; i++) {
+        const item = savedInv[i];
         this.player.inventory.setItem(i, item ? item : null);
       }
+
+      eventBus.emit('player_status_change');
+      eventBus.emit('player_xp_change');
     } else {
       // First load, generate spawn position
       eventBus.emit('loading_progress', 'Generating spawn column...', 50);
+      this.chunkManager.update(0, 0); // Load chunk at (0,0) before calling initSpawn
       this.player.initSpawn(this.chunkManager);
       // Give basic startup gear
       this.player.inventory.clear();
@@ -184,16 +207,22 @@ export class Game {
       this.player.inventory.setItem(2, createItemStack('stone', 64));
       this.player.inventory.setItem(3, createItemStack('torch', 32));
       this.player.inventory.setItem(4, createItemStack('apple', 10));
+
+      this.player.level = 1;
+      this.player.xp = 0;
+      eventBus.emit('player_status_change');
+      eventBus.emit('player_xp_change');
     }
 
     this.movementController = new MovementController(this.player, this.inputManager, this.chunkManager);
 
     // Pre-load surrounding chunks around player spawn position
     eventBus.emit('loading_progress', 'Building landscape chunks...', 70);
-    const updates = this.chunkManager.update(this.player.position.x, this.player.position.z);
+    this.chunkManager.update(this.player.position.x, this.player.position.z);
     
-    // Meshing pre-loaded chunks
-    for (const chunk of updates.loaded) {
+    // Mesh all active chunks on initial load to ensure the spawn chunks are rendered before gameplay begins
+    const activeChunks = this.chunkManager.getActiveChunks();
+    for (const chunk of activeChunks) {
       const meshData = GreedyMesher.generateGeometry(chunk, this.chunkManager);
       this.renderer.updateChunkMesh(chunk.x, chunk.z, meshData.solid, meshData.transparent);
     }
@@ -243,7 +272,9 @@ export class Game {
       position: { x: this.player.position.x, y: this.player.position.y, z: this.player.position.z },
       inventory: inventoryData,
       daysElapsed: this.dayNightCycle.getDaysElapsed(),
-      timeOfDay: this.dayNightCycle.getTime()
+      timeOfDay: this.dayNightCycle.getTime(),
+      level: this.player.level,
+      xp: this.player.xp
     });
 
     eventBus.emit('saving_complete');
@@ -375,6 +406,17 @@ export class Game {
   }
 
   private handleLeftClick(): void {
+    // Check if we hit a mob first
+    const eyeY = this.player.position.y + this.player.eyeHeight;
+    const origin = new THREE.Vector3(this.player.position.x, eyeY, this.player.position.z);
+    const dir = new THREE.Vector3();
+    this.renderer.camera.getWorldDirection(dir);
+
+    if (this.mobManager && this.mobManager.checkAttack(origin, dir, 4.0, this.player)) {
+      this.resetMining();
+      return;
+    }
+
     if (!this.hitResult) return;
     
     // Mark target block coordinates
@@ -433,6 +475,15 @@ export class Game {
       // Loot item drop drop simulation
       const itemToDrop = block.lootItem || block.name.toLowerCase().replace(' ', '_');
       this.player.inventory.addItem(createItemStack(itemToDrop, 1));
+
+      // Award Level XP: Ores give 25 XP, stone/cobble give 5 XP, others give 2 XP
+      let xpAmount = 2;
+      if (block.id >= 14 && block.id <= 20) {
+        xpAmount = 25;
+      } else if (block.id === 1 || block.id === 19) {
+        xpAmount = 5;
+      }
+      this.player.addXp(xpAmount);
       
       this.resetMining();
     }

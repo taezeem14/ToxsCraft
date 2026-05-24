@@ -130,6 +130,48 @@ export const BIOMES: { [id: number]: BiomeDef } = {
     treeType: 'oak',
     detailChance: 0.25,
     fogColor: [0.45, 0.55, 0.4]
+  },
+  8: { // Savanna
+    id: 8,
+    name: "Savanna",
+    temperature: 0.8,
+    humidity: 0.2,
+    baseHeight: 0.36,
+    variation: 0.08,
+    surfaceBlock: 3, // Grass
+    subSurfaceBlock: 2, // Dirt
+    treeChance: 0.02,
+    treeType: 'acacia',
+    detailChance: 0.1,
+    fogColor: [0.9, 0.85, 0.75]
+  },
+  9: { // Badlands
+    id: 9,
+    name: "Badlands",
+    temperature: 0.95,
+    humidity: 0.05,
+    baseHeight: 0.45,
+    variation: 0.25,
+    surfaceBlock: 66, // Terracotta
+    subSurfaceBlock: 66, // Terracotta
+    treeChance: 0.0,
+    treeType: 'oak',
+    detailChance: 0.01,
+    fogColor: [0.95, 0.8, 0.65]
+  },
+  10: { // Mushroom Island
+    id: 10,
+    name: "Mushroom Island",
+    temperature: 0.6,
+    humidity: 0.9,
+    baseHeight: 0.35,
+    variation: 0.1,
+    surfaceBlock: 65, // Mycelium
+    subSurfaceBlock: 2, // Dirt
+    treeChance: 0.03,
+    treeType: 'oak',
+    detailChance: 0.2,
+    fogColor: [0.8, 0.85, 0.9]
   }
 };
 

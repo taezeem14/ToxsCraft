@@ -9,6 +9,8 @@ import { settingsManager } from '../core/SettingsManager';
 import { WorldDatabase, WorldMetadata } from '../save/WorldDatabase';
 import { ItemStack, createItemStack } from '../inventory/ItemStack';
 import { getBiome } from '../world/generation/BiomeRegistry';
+import { AssetLoader } from '../core/AssetLoader';
+import { AchievementManager } from '../core/AchievementManager';
 
 export class UIManager {
   private game: Game;
@@ -28,7 +30,8 @@ export class UIManager {
     loadingScreen: document.getElementById('loading-screen')!,
     inventoryScreen: document.getElementById('inventory-screen')!,
     deathScreen: document.getElementById('death-screen')!,
-    creditsScreen: document.getElementById('credits-screen')!
+    creditsScreen: document.getElementById('credits-screen')!,
+    achievementsScreen: document.getElementById('achievements-screen')!
   };
 
   // Held item state
@@ -137,6 +140,15 @@ export class UIManager {
 
     document.getElementById('btn-settings-pause')!.addEventListener('click', () => {
       this.showScreen('settingsScreen');
+    });
+
+    document.getElementById('btn-achievements')!.addEventListener('click', () => {
+      this.renderAchievementsList();
+      this.showScreen('achievementsScreen');
+    });
+
+    document.getElementById('btn-achievements-close')!.addEventListener('click', () => {
+      this.showScreen('pauseScreen');
     });
 
     document.getElementById('btn-quit')!.addEventListener('click', async () => {
@@ -304,6 +316,11 @@ export class UIManager {
       this.drawHUDVitals();
       this.drawHotbarSelection();
     });
+    eventBus.on('player_xp_change', () => this.drawHUDVitals());
+    eventBus.on('player_level_up', (level: number) => {
+      this.showToast(`✨ LEVEL UP! You reached Level ${level} ✨`);
+      AssetLoader.playLevelUpSound();
+    });
     eventBus.on('show_toast', (msg: string) => {
       this.showToast(msg);
     });
@@ -396,6 +413,17 @@ export class UIManager {
       else foodStr += '<span style="color: #444">🍖</span>';
     }
     hungerRow.innerHTML = foodStr;
+
+    // XP and Level rendering
+    const xpLevelEl = document.getElementById('xp-level');
+    const xpFillEl = document.getElementById('xp-fill');
+    if (xpLevelEl && xpFillEl && this.game.player) {
+      const player = this.game.player;
+      xpLevelEl.textContent = player.level.toString();
+      const xpNeeded = player.getXpNeeded();
+      const pct = Math.min(100, Math.max(0, (player.xp / xpNeeded) * 100));
+      xpFillEl.style.width = `${pct}%`;
+    }
   }
 
   private drawHotbarSelection(): void {
@@ -446,6 +474,13 @@ export class UIManager {
     if (itemId === 'apple') return '#e74c3c';
     if (itemId === 'torch') return '#e67e22';
     if (itemId === 'oak_log') return '#8e44ad';
+    if (itemId === 'mycelium') return '#8a6c8a';
+    if (itemId === 'terracotta') return '#d17d4f';
+    if (itemId === 'red_mushroom_block') return '#e74c3c';
+    if (itemId === 'brown_mushroom_block') return '#795548';
+    if (itemId === 'mushroom_stem') return '#f5f5dc';
+    if (itemId === 'acacia_log') return '#e67e22';
+    if (itemId === 'acacia_leaves') return '#27ae60';
     return '#bdc3c7'; // default light gray
   }
 
@@ -541,8 +576,8 @@ export class UIManager {
     grid.innerHTML = '';
     hotbarGrid.innerHTML = '';
 
-    // Draw main storage (slots 9 to 35)
-    for (let i = 9; i < 36; i++) {
+    // Draw main storage (slots 9 to 44) - 36 slots total
+    for (let i = 9; i < 45; i++) {
       const slot = document.createElement('div');
       slot.className = 'hotbar-slot';
       slot.setAttribute('data-idx', i.toString());
@@ -550,6 +585,20 @@ export class UIManager {
       slot.addEventListener('click', () => this.handleSlotClick(i));
       grid.appendChild(slot);
     }
+
+    // Draw armor and off-hand slots (slots 45 to 49)
+    const equipmentSlots = document.querySelectorAll('.inventory-equipment-section .hotbar-slot');
+    equipmentSlots.forEach((slotEl) => {
+      const idxAttr = slotEl.getAttribute('data-idx');
+      if (idxAttr) {
+        const i = parseInt(idxAttr);
+        this.renderSlotItem(slotEl as HTMLElement, this.game.player.inventory.getItem(i));
+        // Remove old listener
+        const newSlot = slotEl.cloneNode(true);
+        slotEl.parentNode!.replaceChild(newSlot, slotEl);
+        newSlot.addEventListener('click', () => this.handleSlotClick(i));
+      }
+    });
 
     // Draw hotbar row (slots 0 to 8)
     for (let i = 0; i < 9; i++) {
@@ -720,5 +769,29 @@ export class UIManager {
       if (stack && stack.id === id && stack.count >= count) return true;
     }
     return false;
+  }
+
+  private renderAchievementsList(): void {
+    const listEl = document.getElementById('achievements-list');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+
+    const achievements = AchievementManager.getInstance().getAchievements();
+    achievements.forEach((ach) => {
+      const row = document.createElement('div');
+      row.className = `achievement-row ${ach.unlocked ? 'unlocked' : 'locked'}`;
+
+      row.innerHTML = `
+        <div class="achievement-icon">${ach.unlocked ? ach.icon : '❓'}</div>
+        <div class="achievement-info">
+          <div class="achievement-title">${ach.title}</div>
+          <div class="achievement-desc">${ach.unlocked ? ach.description : 'Locked achievement'}</div>
+        </div>
+        <div class="achievement-status ${ach.unlocked ? 'unlocked-badge' : 'locked-badge'}">
+          ${ach.unlocked ? 'Unlocked' : 'Locked'}
+        </div>
+      `;
+      listEl.appendChild(row);
+    });
   }
 }

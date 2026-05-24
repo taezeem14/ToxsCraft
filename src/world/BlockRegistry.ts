@@ -91,7 +91,14 @@ export const BLOCKS: { [id: number]: BlockDef } = {
   61: { id: 61, name: "Oak Door Block", solid: true, transparent: true, emissive: 0, hardness: 2.0, lootItem: "oak_door", textures: { top: 21, bottom: 21, side: 21 } },
   62: { id: 62, name: "Ladder", solid: false, transparent: true, emissive: 0, hardness: 0.4, climbable: true, lootItem: "ladder", textures: { top: 69, bottom: 69, side: 69 } },
   63: { id: 63, name: "Cobweb", solid: false, transparent: true, emissive: 0, hardness: 4.0, speedMultiplier: 0.15, lootItem: "string", textures: { top: 70, bottom: 70, side: 70 } },
-  64: { id: 64, name: "Ice Blue", solid: true, transparent: true, emissive: 0, hardness: 0.5, speedMultiplier: 1.2, lootItem: "ice", textures: { top: 25, bottom: 25, side: 25 } }
+  64: { id: 64, name: "Ice Blue", solid: true, transparent: true, emissive: 0, hardness: 0.5, speedMultiplier: 1.2, lootItem: "ice", textures: { top: 25, bottom: 25, side: 25 } },
+  65: { id: 65, name: "Mycelium", solid: true, transparent: false, emissive: 0, hardness: 0.6, lootItem: "dirt", textures: { top: 71, bottom: 2, side: 72 } },
+  66: { id: 66, name: "Terracotta", solid: true, transparent: false, emissive: 0, hardness: 1.25, lootItem: "terracotta", textures: { top: 73, bottom: 73, side: 73 } },
+  67: { id: 67, name: "Red Mushroom Block", solid: true, transparent: false, emissive: 0, hardness: 0.2, lootItem: "red_mushroom", textures: { top: 74, bottom: 77, side: 74 } },
+  68: { id: 68, name: "Brown Mushroom Block", solid: true, transparent: false, emissive: 0, hardness: 0.2, lootItem: "brown_mushroom", textures: { top: 75, bottom: 77, side: 75 } },
+  69: { id: 69, name: "Mushroom Stem", solid: true, transparent: false, emissive: 0, hardness: 0.2, lootItem: "mushroom_stem", textures: { top: 76, bottom: 76, side: 76 } },
+  70: { id: 70, name: "Acacia Log", solid: true, transparent: false, emissive: 0, hardness: 2.0, lootItem: "acacia_log", textures: { top: 78, bottom: 78, side: 79 } },
+  71: { id: 71, name: "Acacia Leaves", solid: true, transparent: true, emissive: 0, hardness: 0.2, lootItem: "acacia_sapling", textures: { top: 80, bottom: 80, side: 80 } }
 };
 
 export function getBlock(id: number): BlockDef {

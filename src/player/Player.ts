@@ -31,10 +31,15 @@ export class Player {
   public maxStamina = 20.0;
   public isDead = false;
 
+  // Level progression stats
+  public level = 1;
+  public xp = 0;
+
   // Inventory
   public inventory = new Inventory();
 
   private regenTimer = 0;
+
   private hungerTimer = 0;
 
   constructor() {
@@ -50,8 +55,13 @@ export class Player {
     let spawnY = 80; // Safe fallback
     for (let y = 250; y > 0; y--) {
       const blockId = chunkManager.getBlock(0, y, 0);
-      if (blockId !== 0 && blockId !== 9) { // Solid ground (not air or water)
-        spawnY = y + 1.5;
+      if (blockId !== 0) {
+        if (blockId === 9) {
+          // If the highest block at (0,0) is water, spawn the player floating on water at Y=63.5
+          spawnY = 63.5;
+        } else {
+          spawnY = y + 1.5;
+        }
         break;
       }
     }
@@ -138,6 +148,28 @@ export class Player {
     this.isDead = false;
     this.position.set(0.5, 80, 0.5); // Teleport to safe height
     this.velocity.set(0, 0, 0);
+    // Reset progression on death if desired, or keep it. Let's keep it but emit status change.
     eventBus.emit('player_status_change');
   }
+
+  public addXp(amount: number): void {
+    if (this.isDead) return;
+    this.xp += amount;
+    let leveledUp = false;
+    while (this.xp >= this.getXpNeeded()) {
+      this.xp -= this.getXpNeeded();
+      this.level++;
+      leveledUp = true;
+    }
+    eventBus.emit('player_xp_change');
+    if (leveledUp) {
+      eventBus.emit('player_level_up', this.level);
+      eventBus.emit('player_status_change'); // refresh health/hunger/level values
+    }
+  }
+
+  public getXpNeeded(): number {
+    return this.level * 100;
+  }
 }
+

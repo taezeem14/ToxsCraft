@@ -22,7 +22,10 @@ export interface SavedPlayer {
   inventory: any[]; // Serialized slots
   daysElapsed: number;
   timeOfDay: number;
+  level?: number;
+  xp?: number;
 }
+
 
 export class WorldDatabase {
   private static DB_NAME = 'toxscraft_db';

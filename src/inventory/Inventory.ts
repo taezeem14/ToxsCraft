@@ -11,8 +11,8 @@ export class Inventory {
   private selectedSlotIndex = 0; // 0 to 8 (hotbar)
 
   constructor() {
-    // 36 slots: 0-8 are Hotbar, 9-35 are Main Inventory
-    for (let i = 0; i < 36; i++) {
+    // 50 slots: 0-8 are Hotbar, 9-44 are Main Inventory, 45-48 are Armor, 49 is Off-hand
+    for (let i = 0; i < 50; i++) {
       this.slots.push(null);
     }
 
@@ -51,7 +51,7 @@ export class Inventory {
    * Get stack at slot index
    */
   public getItem(index: number): ItemStack | null {
-    if (index < 0 || index >= 36) return null;
+    if (index < 0 || index >= 50) return null;
     return this.slots[index];
   }
 
@@ -59,7 +59,7 @@ export class Inventory {
    * Set stack at slot index
    */
   public setItem(index: number, stack: ItemStack | null): void {
-    if (index >= 0 && index < 36) {
+    if (index >= 0 && index < 50) {
       this.slots[index] = stack;
       eventBus.emit('inventory_update');
     }
@@ -73,8 +73,8 @@ export class Inventory {
     let remaining = item.count;
     const max = item.maxStack || 64;
 
-    // 1. Try to merge into existing stacks of same item
-    for (let i = 0; i < 36; i++) {
+    // 1. Try to merge into existing stacks of same item (exclude armor and off-hand slots 45-49)
+    for (let i = 0; i < 45; i++) {
       const slot = this.slots[i];
       if (slot && slot.id === item.id && slot.count < max) {
         const addAmount = Math.min(remaining, max - slot.count);
@@ -87,8 +87,8 @@ export class Inventory {
       }
     }
 
-    // 2. Insert into first available empty slots
-    for (let i = 0; i < 36; i++) {
+    // 2. Insert into first available empty slots (exclude armor and off-hand slots 45-49)
+    for (let i = 0; i < 45; i++) {
       if (this.slots[i] === null) {
         const addAmount = Math.min(remaining, max);
         this.slots[i] = createItemStack(item.id, addAmount, item.durability);
@@ -119,7 +119,7 @@ export class Inventory {
   }
 
   public clear(): void {
-    for (let i = 0; i < 36; i++) {
+    for (let i = 0; i < 50; i++) {
       this.slots[i] = null;
     }
     eventBus.emit('inventory_update');

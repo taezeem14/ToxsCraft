@@ -261,8 +261,13 @@ body, html {
 .status-row {
   display: flex;
   gap: 3px;
-  font-size: 1.5rem;
+  font-size: 1.1rem;
   line-height: 1;
+}
+
+.status-row span {
+  font-size: 1.1rem;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
 }
 
 .text-right {
@@ -437,7 +442,7 @@ body, html {
   border: 4px solid var(--color-border);
   border-radius: 4px;
   padding: 24px;
-  width: 650px;
+  width: 820px;
   animation: scaleUp 0.15s ease-out;
 }
 
@@ -610,3 +615,179 @@ body, html {
 .animate-pulse {
   animation: pulse 1.5s infinite;
 }
+
+/* --- HUD XP Bar & Level --- */
+.xp-container {
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: -2px;
+  margin-bottom: 2px;
+}
+
+#xp-level {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  font-weight: bold;
+  color: #55ff55;
+  text-shadow: 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+  margin-bottom: 1px;
+}
+
+.xp-bar {
+  width: 100%;
+  height: 6px;
+  background-color: rgba(0, 0, 0, 0.6);
+  border: 1px solid #333;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+#xp-fill {
+  height: 100%;
+  width: 0%;
+  background-color: #55ff55;
+  box-shadow: 0 0 5px #55ff55;
+  transition: width 0.2s ease;
+}
+
+/* --- Equipment & Armor Slots --- */
+.inventory-equipment-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.equipment-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  background-color: rgba(0,0,0,0.25);
+  border: 2px solid var(--color-border);
+  padding: 15px;
+  border-radius: 4px;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.armor-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.armor-slot::before, .offhand-slot::before {
+  font-size: 1.2rem;
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.armor-slot[data-slot-type="head"]::before { content: '🪖'; }
+.armor-slot[data-slot-type="chest"]::before { content: '👕'; }
+.armor-slot[data-slot-type="legs"]::before { content: '👖'; }
+.armor-slot[data-slot-type="feet"]::before { content: '🥾'; }
+
+.offhand-slot-container {
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+  margin-top: 5px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.offhand-slot::before {
+  content: '🛡️';
+}
+
+.armor-slot:empty::before, .offhand-slot:empty::before {
+  display: block;
+}
+
+.armor-slot:not(:empty)::before, .offhand-slot:not(:empty)::before {
+  display: none !important;
+}
+
+/* --- Achievements Overlay --- */
+.achievements-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 300px;
+  overflow-y: auto;
+  margin: 15px 0;
+  padding-right: 5px;
+}
+
+.achievement-row {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  background-color: rgba(0, 0, 0, 0.4);
+  border: 2px solid var(--color-border);
+  border-radius: 4px;
+  padding: 12px 18px;
+  transition: all 0.2s ease;
+}
+
+.achievement-row.locked {
+  opacity: 0.55;
+  border-color: #2e2e42;
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.achievement-row.unlocked {
+  border-color: #5b8a6f;
+  background-color: rgba(91, 138, 111, 0.1);
+  box-shadow: 0 0 8px rgba(91, 138, 111, 0.2);
+}
+
+.achievement-icon {
+  font-size: 2rem;
+  min-width: 45px;
+  text-align: center;
+}
+
+.achievement-info {
+  text-align: left;
+  flex-grow: 1;
+}
+
+.achievement-title {
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  font-weight: bold;
+  color: #fff;
+}
+
+.achievement-row.unlocked .achievement-title {
+  color: var(--color-accent);
+}
+
+.achievement-desc {
+  font-size: 0.85rem;
+  color: #aaa;
+  margin-top: 2px;
+}
+
+.achievement-status {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: bold;
+  padding: 4px 8px;
+  border-radius: 3px;
+  text-transform: uppercase;
+}
+
+.achievement-status.unlocked-badge {
+  background-color: #5b8a6f;
+  color: #fff;
+}
+
+.achievement-status.locked-badge {
+  background-color: #333;
+  color: #888;
+}
+

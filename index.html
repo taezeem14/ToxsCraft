@@ -38,6 +38,14 @@
         <div id="hunger-bar" class="status-row text-right"></div>
       </div>
       
+      <!-- XP Bar & Level -->
+      <div class="xp-container">
+        <span id="xp-level">1</span>
+        <div class="xp-bar">
+          <div id="xp-fill" style="width: 0%"></div>
+        </div>
+      </div>
+      
       <!-- 9-slot Hotbar -->
       <div id="hotbar" class="hotbar-container">
         <!-- Generated slots 0-8 -->
@@ -115,6 +123,7 @@
       <h2>Game Paused</h2>
       <div class="menu-buttons">
         <button id="btn-resume" class="btn btn-primary">Resume Game</button>
+        <button id="btn-achievements" class="btn">Achievements</button>
         <button id="btn-settings-pause" class="btn">Settings</button>
         <button id="btn-quit" class="btn">Save & Quit</button>
       </div>
@@ -183,11 +192,27 @@
       </div>
       
       <div class="inventory-layout">
-        <!-- 27 Main slots and 9 hotbar slots -->
+        <!-- Equipment Section -->
+        <div class="inventory-equipment-section">
+          <h3>Equipment</h3>
+          <div class="equipment-layout">
+            <div class="armor-slots">
+              <div class="hotbar-slot armor-slot" data-slot-type="head" data-idx="45" title="Helmet"></div>
+              <div class="hotbar-slot armor-slot" data-slot-type="chest" data-idx="46" title="Chestplate"></div>
+              <div class="hotbar-slot armor-slot" data-slot-type="legs" data-idx="47" title="Leggings"></div>
+              <div class="hotbar-slot armor-slot" data-slot-type="feet" data-idx="48" title="Boots"></div>
+            </div>
+            <div class="offhand-slot-container">
+              <div class="hotbar-slot offhand-slot" data-idx="49" title="Off-hand"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 36 Main slots and 9 hotbar slots -->
         <div class="inventory-main-section">
           <h3>Storage</h3>
           <div id="inventory-slots-grid" class="slots-grid">
-            <!-- Dynamic Slots 9-35 -->
+            <!-- Dynamic Slots 9-44 -->
           </div>
           
           <h3>Hotbar</h3>
@@ -222,6 +247,19 @@
       <div class="menu-buttons">
         <button id="btn-respawn" class="btn btn-primary red-bg">Respawn</button>
         <button id="btn-death-quit" class="btn">Quit to Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Achievements Screen -->
+  <div id="achievements-screen" class="ui-screen menu-container hidden">
+    <div class="menu-card wide text-center">
+      <h2>Achievements</h2>
+      <div id="achievements-list" class="achievements-list-container">
+        <!-- Achievements dynamically rendered here -->
+      </div>
+      <div class="menu-actions">
+        <button id="btn-achievements-close" class="btn btn-primary">Back</button>
       </div>
     </div>
   </div>

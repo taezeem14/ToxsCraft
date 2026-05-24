@@ -632,6 +632,125 @@ export class AssetLoader {
         ctx.stroke();
         break;
 
+      case 71: // Mycelium Top
+        gridNoise(122, 98, 122, 12); // purple-gray mycelium color
+        // Add purple/spore spots
+        for (let i = 0; i < 6; i++) {
+          const px = Math.floor(Math.random() * 14) + 1;
+          const py = Math.floor(Math.random() * 14) + 1;
+          pixel(px, py, '#9a7ca5');
+          pixel(px, py - 1, '#b096bb');
+        }
+        break;
+
+      case 72: // Mycelium Side
+        // Bottom dirt
+        ctx.fillStyle = '#6e4b2e';
+        ctx.fillRect(x, y + 4, 16, 12);
+        // Add dirt noise
+        for (let py = 4; py < 16; py++) {
+          for (let px = 0; px < 16; px++) {
+            if (Math.random() > 0.7) {
+              ctx.fillStyle = Math.random() > 0.5 ? '#5c3e26' : '#7f5938';
+              ctx.fillRect(x + px, y + py, 1, 1);
+            }
+          }
+        }
+        // Top purple overlay
+        ctx.fillStyle = '#8a6c8a';
+        ctx.fillRect(x, y, 16, 4);
+        // Spores hanging down
+        for (let px = 0; px < 16; px++) {
+          const depth = Math.floor(Math.random() * 4) + 2;
+          ctx.fillStyle = '#8a6c8a';
+          ctx.fillRect(x + px, y, 1, depth);
+          pixel(px, depth - 1, '#664d66');
+        }
+        break;
+
+      case 73: // Terracotta
+        gridNoise(178, 108, 79, 10); // Reddish-orange terracotta clay
+        // Add some horizontal color bands
+        ctx.fillStyle = '#9e5a37';
+        ctx.fillRect(x, y + 3, 16, 2);
+        ctx.fillRect(x, y + 10, 16, 3);
+        ctx.fillStyle = '#c57d56';
+        ctx.fillRect(x, y + 7, 16, 1);
+        break;
+
+      case 74: // Red Mushroom Block
+        fillTile('#b71c1c'); // Deep red
+        // Add white spots
+        pixel(2, 2, '#ffffff');
+        pixel(3, 2, '#ffffff');
+        pixel(2, 3, '#ffffff');
+        pixel(11, 4, '#ffffff');
+        pixel(12, 4, '#ffffff');
+        pixel(11, 5, '#ffffff');
+        pixel(6, 9, '#ffffff');
+        pixel(7, 9, '#ffffff');
+        pixel(6, 10, '#ffffff');
+        pixel(13, 12, '#ffffff');
+        pixel(2, 13, '#ffffff');
+        break;
+
+      case 75: // Brown Mushroom Block
+        fillTile('#5d4037'); // Medium brown
+        // Add lighter brown/tan spots
+        pixel(3, 3, '#8d6e63');
+        pixel(4, 3, '#8d6e63');
+        pixel(10, 2, '#8d6e63');
+        pixel(12, 7, '#8d6e63');
+        pixel(6, 11, '#8d6e63');
+        pixel(7, 11, '#8d6e63');
+        pixel(13, 12, '#8d6e63');
+        pixel(2, 12, '#8d6e63');
+        break;
+
+      case 76: // Mushroom Stem
+        gridNoise(225, 220, 210, 5); // Off-white/cream stem
+        // Light grey vertical texture lines
+        ctx.fillStyle = '#b0aaa0';
+        ctx.fillRect(x + 4, y, 1, 16);
+        ctx.fillRect(x + 11, y, 1, 16);
+        break;
+
+      case 77: // Mushroom Inside
+        gridNoise(235, 230, 220, 4); // Light beige/cream inside pores
+        break;
+
+      case 78: // Acacia Log Top
+        gridNoise(216, 115, 60, 8); // Orange center
+        ctx.strokeStyle = '#5c544d'; // grey ring
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + 2.5, y + 2.5, 11, 11);
+        ctx.strokeRect(x + 5.5, y + 5.5, 5, 5);
+        pixel(7, 7, '#e67e22');
+        break;
+
+      case 79: // Acacia Log Side
+        gridNoise(100, 95, 90, 8); // Grey outer bark
+        // Vertical lines with orange cracks/accents
+        ctx.fillStyle = '#e67e22';
+        ctx.fillRect(x + 3, y, 1, 16);
+        ctx.fillRect(x + 11, y, 1, 16);
+        ctx.fillStyle = '#5c544d';
+        ctx.fillRect(x + 2, y, 1, 16);
+        ctx.fillRect(x + 10, y, 1, 16);
+        break;
+
+      case 80: // Acacia Leaves
+        gridNoise(45, 120, 40, 20); // slightly different green
+        // Punch some transparent holes
+        for (let i = 0; i < 20; i++) {
+          const px = Math.floor(Math.random() * 16);
+          const py = Math.floor(Math.random() * 16);
+          if (px > 0 && px < 15 && py > 0 && py < 15) {
+            pixel(px, py, 'rgba(0,0,0,0)');
+          }
+        }
+        break;
+
       default: // Cobblestone / generic default
         gridNoise(100, 100, 100, 15);
         // Draw stones dividers
@@ -678,7 +797,7 @@ export class AssetLoader {
   /**
    * Synth sound: plays standard sound effect
    */
-  public static playSound(type: 'dig' | 'place' | 'walk' | 'hurt' | 'jump', blockId = 0): void {
+  public static playSound(type: 'dig' | 'place' | 'walk' | 'hurt' | 'jump' | 'hiss' | 'explode' | 'shoot' | 'hit', blockId = 0): void {
     try {
       this.initAudio();
       if (!this.audioCtx) return;
@@ -734,11 +853,161 @@ export class AssetLoader {
 
         osc.start(now);
         osc.stop(now + 0.25);
+      } else if (type === 'hiss') {
+        // White noise bandpass sweep for creeper fuse
+        const bufferSize = this.audioCtx.sampleRate * 1.5;
+        const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+        const noise = this.audioCtx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = this.audioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(1200, now);
+
+        noise.connect(filter);
+        filter.connect(gain);
+
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+
+        noise.start(now);
+        noise.stop(now + 1.5);
+      } else if (type === 'explode') {
+        // Low-pitch noise + rumble
+        const bufferSize = this.audioCtx.sampleRate * 0.8;
+        const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          data[i] = Math.random() * 2 - 1;
+        }
+        const noise = this.audioCtx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = this.audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(250, now);
+        filter.frequency.exponentialRampToValueAtTime(10, now + 0.8);
+
+        noise.connect(filter);
+        filter.connect(gain);
+
+        // Combine with a low frequency sine wave for punch
+        const subOsc = this.audioCtx.createOscillator();
+        subOsc.type = 'sawtooth';
+        subOsc.frequency.setValueAtTime(90, now);
+        subOsc.frequency.linearRampToValueAtTime(5, now + 0.65);
+        
+        const subGain = this.audioCtx.createGain();
+        subGain.gain.setValueAtTime(0.35, now);
+        subGain.gain.exponentialRampToValueAtTime(0.01, now + 0.65);
+        subOsc.connect(subGain);
+        subGain.connect(this.audioCtx.destination);
+
+        gain.gain.setValueAtTime(0.35, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+        
+        noise.start(now);
+        noise.stop(now + 0.8);
+        subOsc.start(now);
+        subOsc.stop(now + 0.8);
+      } else if (type === 'shoot') {
+        // High frequency sweep
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(450, now);
+        osc.frequency.exponentialRampToValueAtTime(900, now + 0.12);
+
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+        osc.start(now);
+        osc.stop(now + 0.12);
+      } else if (type === 'hit') {
+        // Arrow thump
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+        osc.start(now);
+        osc.stop(now + 0.1);
       }
     } catch (e) {
       console.warn('Audio context playback failed (needs user gesture interaction).', e);
     }
   }
+
+  /**
+   * Synth sound: plays level up arpeggio chime
+   */
+  public static playLevelUpSound(): void {
+    try {
+      this.initAudio();
+      if (!this.audioCtx) return;
+      const now = this.audioCtx.currentTime;
+
+      // Arpeggio notes: C5, E5, G5, C6
+      const freqs = [523.25, 659.25, 783.99, 1046.50];
+      freqs.forEach((freq, idx) => {
+        const time = now + idx * 0.12;
+        const osc = this.audioCtx!.createOscillator();
+        const gain = this.audioCtx!.createGain();
+        osc.connect(gain);
+        gain.connect(this.audioCtx!.destination);
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, time);
+
+        gain.gain.setValueAtTime(0.0, time);
+        gain.gain.linearRampToValueAtTime(0.15, time + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.35);
+
+        osc.start(time);
+        osc.stop(time + 0.4);
+      });
+    } catch (e) {
+      console.warn('Level up sound failed', e);
+    }
+  }
+
+  /**
+   * Synth sound: plays achievement unlocked chime
+   */
+  public static playAchievementSound(): void {
+    try {
+      this.initAudio();
+      if (!this.audioCtx) return;
+      const now = this.audioCtx.currentTime;
+
+      // High-pitched double chime: E6 then G6
+      const freqs = [659.25, 783.99];
+      freqs.forEach((freq, idx) => {
+        const time = now + idx * 0.1;
+        const osc = this.audioCtx!.createOscillator();
+        const gain = this.audioCtx!.createGain();
+        osc.connect(gain);
+        gain.connect(this.audioCtx!.destination);
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, time);
+
+        gain.gain.setValueAtTime(0.0, time);
+        gain.gain.linearRampToValueAtTime(0.1, time + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + 0.25);
+
+        osc.start(time);
+        osc.stop(time + 0.3);
+      });
+    } catch (e) {
+      console.warn('Achievement sound failed', e);
+    }
+  }
+
 
   /**
    * Synthesize arpeggiated ambient music
