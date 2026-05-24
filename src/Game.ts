@@ -198,20 +198,24 @@ export class Game {
     } else {
       // First load, generate spawn position
       eventBus.emit('loading_progress', 'Generating spawn column...', 50);
-      this.chunkManager.update(0, 0); // Load chunk at (0,0) before calling initSpawn
-      this.player.initSpawn(this.chunkManager);
-      // Give basic startup gear
-      this.player.inventory.clear();
-      this.player.inventory.setItem(0, createItemStack('wood_pickaxe', 1));
-      this.player.inventory.setItem(1, createItemStack('grass_block', 64));
-      this.player.inventory.setItem(2, createItemStack('stone', 64));
-      this.player.inventory.setItem(3, createItemStack('torch', 32));
-      this.player.inventory.setItem(4, createItemStack('apple', 10));
 
-      this.player.level = 1;
-      this.player.xp = 0;
-      eventBus.emit('player_status_change');
-      eventBus.emit('player_xp_change');
+      // A simple loop to find the highest non-air block near 0,0
+      const spawnX = 0;
+      const spawnZ = 0;
+      let spawnY = 255;
+      
+      // Load/Generate the center chunk fully first
+      await this.preloadSpawnChunks(spawnX, spawnZ);
+
+      // Find surface y
+      while (spawnY > 0 && this.chunkManager.getBlock(spawnX, spawnY, spawnZ) === 0) {
+        spawnY--;
+      }
+
+      this.player.position.set(spawnX + 0.5, spawnY + 2.0, spawnZ + 0.5);
+      
+      // Default standard starting inventory
+      this.giveStarterKit();
     }
 
     this.movementController = new MovementController(this.player, this.inputManager, this.chunkManager);
@@ -278,6 +282,21 @@ export class Game {
     });
 
     eventBus.emit('saving_complete');
+  }
+
+  private async preloadSpawnChunks(spawnX: number, spawnZ: number): Promise<void> {
+    const chunkX = Math.floor(spawnX / 16);
+    const chunkZ = Math.floor(spawnZ / 16);
+    // Force generation of the 3x3 initial spawn grid
+    for (let x = -1; x <= 1; x++) {
+      for (let z = -1; z <= 1; z++) {
+         this.chunkManager.getChunk(chunkX + x, chunkZ + z);
+      }
+    }
+  }
+
+  private giveStarterKit(): void {
+    // Basic setup if wanted, currently we just leave UI empty
   }
 
   /**
