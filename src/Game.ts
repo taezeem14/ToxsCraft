@@ -11,6 +11,7 @@ import { Player } from './player/Player';
 import { MovementController } from './player/MovementController';
 import { InputManager } from './core/InputManager';
 import { DayNightCycle } from './world/DayNightCycle';
+import { Physics } from './physics/Physics';
 import { Raycaster, RaycastResult } from './physics/Raycaster';
 import { GreedyMesher } from './renderer/GreedyMesher';
 import { WorldDatabase, WorldMetadata } from './save/WorldDatabase';
@@ -241,8 +242,19 @@ export class Game {
     eventBus.emit('loading_progress', 'Building landscape chunks...', 70);
     
     // Warm up the core 3x3 chunks immediately before starting the loop so the player has somewhere to stand safely
-    for (let i = 0; i < 9; i++) {
-      this.chunkManager.update(this.player.position.x, this.player.position.z);
+    const playerChunkX = Math.floor(this.player.position.x / 16);
+    const playerChunkZ = Math.floor(this.player.position.z / 16);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        this.chunkManager.forceLoadChunk(playerChunkX + dx, playerChunkZ + dz);
+      }
+    }
+
+    // Safe-spawn / Unstuck check: if the player Y is extremely low (e.g. Y < 12) or if they load stuck inside solid blocks
+    const isStuck = Physics.checkCollision(this.player.position, this.player.radius, this.player.height, this.chunkManager);
+    if (this.player.position.y < 12 || isStuck) {
+      console.log(`Unstuck triggered on load: player was at Y=${this.player.position.y}, isStuck=${isStuck}`);
+      this.player.teleportToSurface(this.chunkManager);
     }
     
     // Mesh all active chunks on initial load to ensure the spawn chunks are rendered before gameplay begins

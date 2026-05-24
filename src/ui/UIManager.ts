@@ -133,8 +133,12 @@ export class UIManager {
       await this.game.loadWorld(metadata);
     });
 
-    // 4. Pause Screen
     document.getElementById('btn-resume')!.addEventListener('click', () => {
+      this.game.togglePause();
+    });
+
+    document.getElementById('btn-unstuck')!.addEventListener('click', () => {
+      this.game.player.teleportToSurface(this.game.chunkManager);
       this.game.togglePause();
     });
 

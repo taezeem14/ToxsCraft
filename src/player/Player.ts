@@ -202,6 +202,57 @@ export class Player {
     }
   }
 
+  /**
+   * Teleports the player to the surface at their current X, Z coordinates.
+   * Useful for loading into safe heights or recovering from physics/clipping bugs.
+   */
+  public teleportToSurface(chunkManager: any): void {
+    const px = Math.floor(this.position.x);
+    const pz = Math.floor(this.position.z);
+    
+    // Force load the chunk immediately
+    const { cx, cz } = chunkManager.getChunkCoords(px, pz);
+    chunkManager.forceLoadChunk(cx, cz);
+    
+    let spawnY = 80; // Safe fallback
+
+    // Scan downward from Y=250 to find the topmost solid surface
+    let topmostY = -1;
+    let topmostId = 0;
+    for (let y = 250; y > 0; y--) {
+      const bid = chunkManager.getBlock(px, y, pz);
+      if (bid !== 0) {
+        topmostY = y;
+        topmostId = bid;
+        break;
+      }
+    }
+
+    if (topmostY >= 0) {
+      if (topmostId === 9) { // Water surface
+        spawnY = topmostY + 1.2;
+      } else {
+        // Look for topmost solid block with 2 air blocks above
+        for (let y = topmostY; y > 0; y--) {
+          const blockId = chunkManager.getBlock(px, y, pz);
+          if (blockId !== 0 && blockId !== 9) {
+            const above1 = chunkManager.getBlock(px, y + 1, pz);
+            const above2 = chunkManager.getBlock(px, y + 2, pz);
+            if (above1 === 0 && above2 === 0) {
+              spawnY = y + 1.5;
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    this.position.set(this.position.x, spawnY, this.position.z);
+    this.velocity.set(0, 0, 0);
+    this.onGround = true;
+    eventBus.emit('show_toast', 'Teleported to surface!');
+  }
+
   public getXpNeeded(): number {
     return this.level * 100;
   }
