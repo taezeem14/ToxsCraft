@@ -46,12 +46,13 @@ export class Renderer {
     // Renderer Setup
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
-      antialias: true,
+      antialias: false, // Disable antialias for better laptop/mobile compatibility
       powerPreference: "high-performance",
       precision: "mediump"
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Cap pixel ratio to 1 for software renderers and mobile performance
+    this.renderer.setPixelRatio(1);
     const shadows = settingsManager.getValue('shadows');
     this.renderer.shadowMap.enabled = shadows;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -174,7 +175,16 @@ export class Renderer {
     geom.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(data.normals), 3));
     geom.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(data.uvs), 2));
     geom.setAttribute('color', new THREE.BufferAttribute(new Float32Array(data.colors), 3));
-    geom.setIndex(data.indices);
+    
+    // Explicitly use Uint32Array for indices if the number of vertices exceeds 65535,
+    // otherwise fallback to Uint16Array for better compatibility on older/software GPUs.
+    const vertexCount = data.positions.length / 3;
+    if (vertexCount > 65535) {
+      geom.setIndex(new THREE.BufferAttribute(new Uint32Array(data.indices), 1));
+    } else {
+      geom.setIndex(new THREE.BufferAttribute(new Uint16Array(data.indices), 1));
+    }
+    
     return geom;
   }
 
