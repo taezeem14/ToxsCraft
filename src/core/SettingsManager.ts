@@ -18,9 +18,35 @@ export interface GameSettings {
   showCoordinates: boolean;
 }
 
+function detectSoftwareRenderer(): boolean {
+  try {
+    const canvas = document.createElement('canvas');
+    const gl = (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')) as WebGLRenderingContext | null;
+    if (!gl) return true;
+    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+    if (debugInfo) {
+      const renderer = (gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || '').toString().toLowerCase();
+      const vendor = (gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) || '').toString().toLowerCase();
+      return (
+        renderer.includes('software') ||
+        renderer.includes('swiftshader') ||
+        renderer.includes('llvmpipe') ||
+        renderer.includes('basic render') ||
+        vendor.includes('swiftshader')
+      );
+    }
+  } catch (e) {
+    // Fallback if context creation fails
+  }
+  return false;
+}
+
+const isSoftware = detectSoftwareRenderer();
+const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
+
 const DEFAULT_SETTINGS: GameSettings = {
   fov: 75,
-  renderDistance: 4,
+  renderDistance: isSoftware ? 2 : (isMobileDevice ? 3 : 4),
   mouseSensitivity: 0.002,
   volumeMaster: 0.8,
   volumeMusic: 0.5,
@@ -71,6 +97,13 @@ class SettingsManager {
       if (data) {
         const parsed = JSON.parse(data);
         this.settings = { ...DEFAULT_SETTINGS, ...parsed };
+        
+        // Auto-optimize render distance for low-end / software devices on load
+        if (isSoftware && this.settings.renderDistance > 3) {
+          this.settings.renderDistance = 2;
+        } else if (isMobileDevice && this.settings.renderDistance > 4) {
+          this.settings.renderDistance = 3;
+        }
       } else {
         this.settings = { ...DEFAULT_SETTINGS };
       }

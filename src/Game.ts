@@ -307,9 +307,12 @@ export class Game {
 
   private async preloadSpawnChunks(spawnX: number, spawnZ: number): Promise<void> {
     // Generate chunks synchronously around the spawn point
-    this.chunkManager.update(spawnX, spawnZ);
-    // Wait a brief moment to ensure block arrays are accessible
-    await new Promise(resolve => setTimeout(resolve, 100));
+    const { cx, cz } = this.chunkManager.getChunkCoords(spawnX, spawnZ);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        this.chunkManager.forceLoadChunk(cx + dx, cz + dz);
+      }
+    }
   }
 
   private giveStarterKit(): void {
@@ -583,14 +586,14 @@ export class Game {
     eventBus.emit('pause_toggle', this.isPaused);
   }
 
-  /**
-   * Resets player stats and repositions the player on a safe surface.
-   * Called by the death screen "Respawn" button via UIManager.
-   */
   public respawnPlayer(): void {
     this.player.respawn();
     // Pre-load spawn area before repositioning
-    this.chunkManager.update(0, 0);
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        this.chunkManager.forceLoadChunk(dx, dz);
+      }
+    }
     this.player.initSpawn(this.chunkManager);
     this.isPaused = false;
     this.inputManager.requestLock();

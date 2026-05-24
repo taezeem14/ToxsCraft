@@ -136,6 +136,19 @@ export class ChunkManager {
   }
 
   /**
+   * Force-generates a chunk immediately (synchronous, bypasses the 1-per-frame limit).
+   * Call this before initSpawn to guarantee the spawn column is available.
+   */
+  public forceLoadChunk(cx: number, cz: number): void {
+    const key = this.getChunkKey(cx, cz);
+    if (!this.chunks.has(key)) {
+      const chunk = new Chunk(cx, cz);
+      this.generator.generateChunk(chunk);
+      this.chunks.set(key, chunk);
+    }
+  }
+
+  /**
    * Checks if coordinates are loaded
    */
   public isChunkLoaded(cx: number, cz: number): boolean {

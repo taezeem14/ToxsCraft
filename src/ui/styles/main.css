@@ -328,14 +328,14 @@ body, html {
 .status-row {
   display: flex;
   gap: 2px;
-  font-size: 0.85rem;
+  font-size: 0.65rem;
   line-height: 1.2;
   flex-wrap: nowrap;
   overflow: hidden;
 }
 
 .status-row span {
-  font-size: 0.85rem;
+  font-size: 0.65rem;
   filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
   display: inline-block;
 }

@@ -58,32 +58,52 @@ export class Player {
 
   /**
    * Resets player position and stats to default spawn.
-   * Scans a small spiral area around (0,0) to find a solid surface with
-   * 2 clear blocks above it. Falls back to Y=80 if no ground is found.
+   * Scans downward from Y=250 to find the topmost solid surface with
+   * 2 clear blocks above it. Only treats spawn as ocean if the topmost
+   * exposed block is water — underground lakes are NOT treated as ocean.
    */
   public initSpawn(chunkManager: any): void {
-    // Find ground level by scanning a small area around (0,0)
     let spawnY = 80; // Safe fallback
     let found = false;
 
-    // Try center first, then spiral out
+    // Try center first, then spiral out to 8 surrounding positions
     const checkPositions = [[0,0],[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[0,2],[0,-2]];
 
     for (const [cx, cz] of checkPositions) {
-      for (let y = 120; y > 2; y--) {
+      // --- Step 1: Find the topmost non-air block scanning from Y=250 ---
+      let topmostY = -1;
+      let topmostId = 0;
+      for (let y = 250; y > 0; y--) {
+        const bid = chunkManager.getBlock(cx, y, cz);
+        if (bid !== 0) {
+          topmostY = y;
+          topmostId = bid;
+          break;
+        }
+      }
+
+      if (topmostY < 0) continue; // column not loaded yet
+
+      // --- Step 2: If the very top exposed block is water → ocean spawn ---
+      if (topmostId === 9) {
+        // Find the actual water surface (top of the water column)
+        spawnY = topmostY + 1.2;
+        found = true;
+        break;
+      }
+
+      // --- Step 3: Otherwise scan downward for first solid + 2 air above ---
+      for (let y = topmostY; y > 0; y--) {
         const blockId = chunkManager.getBlock(cx, y, cz);
-        if (blockId !== 0 && blockId !== 9) { // solid non-water block
+        if (blockId !== 0 && blockId !== 9) { // any solid non-water block
           const above1 = chunkManager.getBlock(cx, y + 1, cz);
           const above2 = chunkManager.getBlock(cx, y + 2, cz);
-          if (above1 === 0 && above2 === 0) { // 2 clear blocks above
+          // Only spawn here if both blocks above are air (not cave ceiling)
+          if (above1 === 0 && above2 === 0) {
             spawnY = y + 1.5;
             found = true;
             break;
           }
-        } else if (blockId === 9) { // Water
-          spawnY = 64.5; // spawn floating on water surface
-          found = true;
-          break;
         }
       }
       if (found) break;
