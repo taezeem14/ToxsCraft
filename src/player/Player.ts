@@ -47,25 +47,48 @@ export class Player {
     eventBus.on('respawn', () => this.respawn());
   }
 
+  public respawn(): void {
+    this.health = 20.0;
+    this.hunger = 20.0;
+    this.stamina = 20.0;
+    this.isDead = false;
+    this.velocity.set(0, 0, 0);
+    eventBus.emit('player_status_change');
+  }
+
   /**
-   * Resets player position and stats to default spawn
+   * Resets player position and stats to default spawn.
+   * Scans a small spiral area around (0,0) to find a solid surface with
+   * 2 clear blocks above it. Falls back to Y=80 if no ground is found.
    */
   public initSpawn(chunkManager: any): void {
-    // Find ground level at spawn X=0, Z=0
+    // Find ground level by scanning a small area around (0,0)
     let spawnY = 80; // Safe fallback
-    for (let y = 250; y > 0; y--) {
-      const blockId = chunkManager.getBlock(0, y, 0);
-      if (blockId !== 0) {
-        if (blockId === 9) {
-          // If the highest block at (0,0) is water, spawn the player floating on water at Y=63.5
-          spawnY = 63.5;
-        } else {
-          spawnY = y + 1.5;
+    let found = false;
+
+    // Try center first, then spiral out
+    const checkPositions = [[0,0],[1,0],[-1,0],[0,1],[0,-1],[2,0],[-2,0],[0,2],[0,-2]];
+
+    for (const [cx, cz] of checkPositions) {
+      for (let y = 120; y > 2; y--) {
+        const blockId = chunkManager.getBlock(cx, y, cz);
+        if (blockId !== 0 && blockId !== 9) { // solid non-water block
+          const above1 = chunkManager.getBlock(cx, y + 1, cz);
+          const above2 = chunkManager.getBlock(cx, y + 2, cz);
+          if (above1 === 0 && above2 === 0) { // 2 clear blocks above
+            spawnY = y + 1.5;
+            found = true;
+            break;
+          }
+        } else if (blockId === 9) { // Water
+          spawnY = 64.5; // spawn floating on water surface
+          found = true;
+          break;
         }
-        break;
       }
+      if (found) break;
     }
-    
+
     this.position.set(0.5, spawnY, 0.5);
     this.velocity.set(0, 0, 0);
     this.health = 20.0;
@@ -141,16 +164,7 @@ export class Player {
     eventBus.emit('player_die');
   }
 
-  private respawn(): void {
-    this.health = 20.0;
-    this.hunger = 20.0;
-    this.stamina = 20.0;
-    this.isDead = false;
-    this.position.set(0.5, 80, 0.5); // Teleport to safe height
-    this.velocity.set(0, 0, 0);
-    // Reset progression on death if desired, or keep it. Let's keep it but emit status change.
-    eventBus.emit('player_status_change');
-  }
+
 
   public addXp(amount: number): void {
     if (this.isDead) return;

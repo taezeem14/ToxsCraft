@@ -59,8 +59,30 @@ export class Physics {
   /**
    * Resolves collision axis-by-axis, sliding the entity along solid boundaries.
    * Modifies entity position and velocity vectors directly.
+   * Includes sub-stepping to prevent tunneling through solid blocks at low frame rates.
    */
   public static moveEntity(
+    entity: PhysicsEntity,
+    deltaSec: number,
+    chunkManager: ChunkManager
+  ): void {
+    const vx = entity.velocity.x;
+    const vy = entity.velocity.y;
+    const vz = entity.velocity.z;
+    const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
+    if (speed === 0) return;
+
+    const maxStep = 0.1; // max distance to move per step
+    const maxDist = speed * deltaSec;
+    const numSteps = Math.max(1, Math.ceil(maxDist / maxStep));
+    const subDelta = deltaSec / numSteps;
+
+    for (let step = 0; step < numSteps; step++) {
+      this.moveEntityStep(entity, subDelta, chunkManager);
+    }
+  }
+
+  private static moveEntityStep(
     entity: PhysicsEntity,
     deltaSec: number,
     chunkManager: ChunkManager

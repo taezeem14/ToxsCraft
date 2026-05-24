@@ -162,10 +162,9 @@ export class UIManager {
 
     // 5. Death Screen
     document.getElementById('btn-respawn')!.addEventListener('click', () => {
-      eventBus.emit('respawn');
       this.hideAllScreens();
       this.hudOverlay.classList.remove('hidden');
-      this.game.inputManager.requestLock();
+      this.game.respawnPlayer();
     });
 
     document.getElementById('btn-death-quit')!.addEventListener('click', () => {
@@ -308,6 +307,24 @@ export class UIManager {
     }, 3000);
   }
 
+  public showAchievementToast(message: string): void {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const el = document.createElement('div');
+    el.className = 'toast toast-gold';
+    el.textContent = message;
+
+    container.appendChild(el);
+
+    // Auto-remove after 4 seconds (slightly longer for achievements)
+    setTimeout(() => {
+      el.style.opacity = '0';
+      el.style.transition = 'opacity 0.5s ease';
+      setTimeout(() => el.remove(), 500);
+    }, 4000);
+  }
+
   private initHUD(): void {
     // Setup listeners for updates
     eventBus.on('player_status_change', () => this.drawHUDVitals());
@@ -322,7 +339,12 @@ export class UIManager {
       AssetLoader.playLevelUpSound();
     });
     eventBus.on('show_toast', (msg: string) => {
-      this.showToast(msg);
+      // Achievement toasts (prefixed with 🏆) get gold styling
+      if (msg.startsWith('🏆')) {
+        this.showAchievementToast(msg);
+      } else {
+        this.showToast(msg);
+      }
     });
     eventBus.on('settings_changed', () => {
       this.syncSettingsUI();
@@ -419,7 +441,7 @@ export class UIManager {
     const xpFillEl = document.getElementById('xp-fill');
     if (xpLevelEl && xpFillEl && this.game.player) {
       const player = this.game.player;
-      xpLevelEl.textContent = player.level.toString();
+      xpLevelEl.textContent = `LVL ${player.level}`;
       const xpNeeded = player.getXpNeeded();
       const pct = Math.min(100, Math.max(0, (player.xp / xpNeeded) * 100));
       xpFillEl.style.width = `${pct}%`;
@@ -440,7 +462,10 @@ export class UIManager {
   }
 
   private renderSlotItem(slotEl: HTMLElement, stack: ItemStack | null): void {
+    // Preserve any .slot-number child (hotbar key labels) when clearing content
+    const slotNumberEl = slotEl.querySelector('.slot-number');
     slotEl.innerHTML = '';
+    if (slotNumberEl) slotEl.appendChild(slotNumberEl);
     if (!stack) return;
 
     const itemDiv = document.createElement('div');

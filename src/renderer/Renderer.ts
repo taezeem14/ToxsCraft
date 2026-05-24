@@ -103,12 +103,17 @@ export class Renderer {
       uTime: { value: 0 }
     };
 
-    // 1. Solid Blocks material
+    // 1. Solid Blocks material (opaque + alpha-solid like leaves/glass/ice)
+    // depthWrite:true and transparent:false (both Three.js defaults for ShaderMaterial)
+    // ensure correct depth buffer writes. The fragment shader discards pixels with
+    // alpha < 0.1, providing alphaTest-style rendering for leaves, glass, ice, etc.
     this.blockMaterial = new THREE.ShaderMaterial({
       vertexShader: blockVertShader,
       fragmentShader: blockFragShader,
       uniforms: commonUniforms,
-      vertexColors: true
+      vertexColors: true,
+      depthWrite: true,
+      transparent: false,
     });
 
     // 2. Liquid Water material
@@ -150,14 +155,11 @@ export class Renderer {
       this.solidMeshes.set(key, mesh);
     }
 
-    // 2. Update transparent mesh
+    // 2. Update transparent mesh (water / lava only — fluid blocks)
+    // These use depthWrite:false to prevent sorting artifacts with overlapping
+    // fluid surfaces. Leaves/glass/ice are handled in the solid pass above.
     if (transparentData.positions.length > 0) {
       const geom = this.buildGeometry(transparentData);
-      
-      // Determine if it is water or lava/glass based on texture IDs or group
-      // For simplicity, transparent mesh in chunk meshes uses waterMaterial
-      // (glass faces are culled into solidData but drawn using transparent flag, 
-      // or we can draw them with blockMaterial since blockMaterial supports alpha discard)
       const mesh = new THREE.Mesh(geom, this.waterMaterial);
       mesh.position.set(cx * CHUNK_SIZE, 0, cz * CHUNK_SIZE);
       

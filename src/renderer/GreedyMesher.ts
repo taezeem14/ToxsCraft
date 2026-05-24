@@ -78,23 +78,36 @@ export class GreedyMesher {
             const b1 = getBlock(current);
             const b2 = getBlock(neighbor);
 
-            // A face exists if:
-            // 1. Current block is solid/liquid and neighbor is transparent/air (or water neighbor with air)
-            // 2. Do not draw solid-solid adjacent faces, or same transparent-transparent adjacent faces (e.g. water-water border)
+            // Classify blocks into render categories:
+            //   fluid      = water / lava (fluid: true)  -> transparent pass (depthWrite:false)
+            //   alphaSolid = transparent:true but NOT fluid (leaves, glass, ice) -> solid pass (alphaTest discard)
+            //   opaque     = everything else solid
             if (current !== 0) {
-              const currentTransparent = b1.transparent || b1.fluid;
-              const neighborTransparent = b2.transparent || b2.fluid;
+              const currentFluid = !!b1.fluid;
+              const currentAlphaSolid = b1.transparent && !b1.fluid; // leaves, glass, ice …
+              const currentOpaque = !b1.transparent && !b1.fluid;
 
-              // Face check
+              const neighborFluid = !!b2.fluid;
+              const neighborAlphaSolid = b2.transparent && !b2.fluid;
+
+              // Face draw rules:
+              //  opaque      -> show face if neighbor is air / fluid / alphaSolid
+              //  alphaSolid  -> show face if neighbor is air or fluid; DON'T show vs. another opaque
+              //                 (the opaque side already draws a face toward us)
+              //                 DO show if neighbor is a DIFFERENT alphaSolid block type
+              //  fluid       -> show face if neighbor is air or opaque/alphaSolid (different block)
               let drawFace = false;
-              if (currentTransparent) {
-                // transparent face draw if neighbor is air or solid
+              if (currentOpaque) {
+                drawFace = neighbor === 0 || neighborFluid || neighborAlphaSolid;
+              } else if (currentAlphaSolid) {
                 if (neighbor === 0) drawFace = true;
-                else if (!neighborTransparent) drawFace = false; // solid hides transparent back
-                else if (current !== neighbor) drawFace = true; // e.g. glass next to water
-              } else {
-                // current is solid
-                if (neighbor === 0 || neighborTransparent) drawFace = true;
+                else if (neighborFluid) drawFace = true;
+                else if (neighborAlphaSolid && current !== neighbor) drawFace = true;
+                // Do NOT draw against opaque blocks – the opaque already covers us
+              } else if (currentFluid) {
+                if (neighbor === 0) drawFace = true;
+                else if (!neighborFluid) drawFace = true; // fluid face against any non-fluid
+                else if (current !== neighbor) drawFace = true; // e.g. water next to lava
               }
 
               if (drawFace) {
@@ -197,8 +210,12 @@ export class GreedyMesher {
             }
 
             // Append vertices and index offsets
-            const dest = (bDef.transparent || bDef.fluid) ? transData : solidData;
-            let ind = (bDef.transparent || bDef.fluid) ? transIndexCount : solidIndexCount;
+            // Only true fluid blocks (water / lava) go into the transparent (depthWrite:false) pass.
+            // Alpha-solid blocks (leaves, glass, ice) stay in the solid pass and rely on
+            // the shader's `discard` for transparent pixels (alphaTest behaviour).
+            const isFluidBlock = !!bDef.fluid;
+            const dest = isFluidBlock ? transData : solidData;
+            let ind = isFluidBlock ? transIndexCount : solidIndexCount;
 
             const n = isBack ? -1 : 1;
             const norm = [axis === 0 ? n : 0, axis === 1 ? n : 0, axis === 2 ? n : 0];
@@ -241,7 +258,7 @@ export class GreedyMesher {
               ind, ind + 2, ind + 3
             );
 
-            if (bDef.transparent || bDef.fluid) {
+            if (isFluidBlock) {
               transIndexCount += 4;
             } else {
               solidIndexCount += 4;

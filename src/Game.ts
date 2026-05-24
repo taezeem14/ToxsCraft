@@ -547,6 +547,19 @@ export class Game {
     eventBus.emit('pause_toggle', this.isPaused);
   }
 
+  /**
+   * Resets player stats and repositions the player on a safe surface.
+   * Called by the death screen "Respawn" button via UIManager.
+   */
+  public respawnPlayer(): void {
+    this.player.respawn();
+    // Pre-load spawn area before repositioning
+    this.chunkManager.update(0, 0);
+    this.player.initSpawn(this.chunkManager);
+    this.isPaused = false;
+    this.inputManager.requestLock();
+  }
+
   private downgradeGraphics(): void {
     this.performanceDowngraded = true;
     
