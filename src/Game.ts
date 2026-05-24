@@ -173,7 +173,7 @@ export class Game {
     await WorldDatabase.init();
 
     eventBus.emit('loading_progress', 'Initializing chunk indices...', 30);
-    this.chunkManager = new ChunkManager(world.seed, settingsManager.getValue('renderDistance'));
+    this.chunkManager = new ChunkManager(world.seed, settingsManager.getValue('renderDistance'), world.id);
 
     // Try loading player save profile
     const savedPlayer = await WorldDatabase.loadPlayer(world.id);
@@ -244,9 +244,10 @@ export class Game {
     // Warm up the core 3x3 chunks immediately before starting the loop so the player has somewhere to stand safely
     const playerChunkX = Math.floor(this.player.position.x / 16);
     const playerChunkZ = Math.floor(this.player.position.z / 16);
+    const worldId = this.activeWorld?.id;
     for (let dx = -1; dx <= 1; dx++) {
       for (let dz = -1; dz <= 1; dz++) {
-        this.chunkManager.forceLoadChunk(playerChunkX + dx, playerChunkZ + dz);
+        await this.chunkManager.forceLoadChunk(playerChunkX + dx, playerChunkZ + dz, worldId);
       }
     }
 
@@ -320,9 +321,10 @@ export class Game {
   private async preloadSpawnChunks(spawnX: number, spawnZ: number): Promise<void> {
     // Generate chunks synchronously around the spawn point
     const { cx, cz } = this.chunkManager.getChunkCoords(spawnX, spawnZ);
+    const worldId = this.activeWorld?.id;
     for (let dx = -1; dx <= 1; dx++) {
       for (let dz = -1; dz <= 1; dz++) {
-        this.chunkManager.forceLoadChunk(cx + dx, cz + dz);
+        await this.chunkManager.forceLoadChunk(cx + dx, cz + dz, worldId);
       }
     }
   }
@@ -598,12 +600,13 @@ export class Game {
     eventBus.emit('pause_toggle', this.isPaused);
   }
 
-  public respawnPlayer(): void {
+  public async respawnPlayer(): Promise<void> {
     this.player.respawn();
     // Pre-load spawn area before repositioning
+    const worldId = this.activeWorld?.id;
     for (let dx = -1; dx <= 1; dx++) {
       for (let dz = -1; dz <= 1; dz++) {
-        this.chunkManager.forceLoadChunk(dx, dz);
+        await this.chunkManager.forceLoadChunk(dx, dz, worldId);
       }
     }
     this.player.initSpawn(this.chunkManager);

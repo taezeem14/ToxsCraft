@@ -12,8 +12,11 @@ export class ChunkManager {
   private chunks: Map<string, Chunk> = new Map();
   private generator: WorldGenerator;
   private renderDistance = 8;
-  constructor(seed: string, renderDistance = 8) {
+  public activeWorldId: string | undefined;
+
+  constructor(seed: string, renderDistance = 8, worldId?: string) {
     this.renderDistance = renderDistance;
+    this.activeWorldId = worldId;
     this.generator = new WorldGenerator(seed);
   }
 
@@ -115,9 +118,27 @@ export class ChunkManager {
     for (const mc of missingChunks) {
       const key = this.getChunkKey(mc.cx, mc.cz);
       const chunk = new Chunk(mc.cx, mc.cz);
+      
+      // Look for locally cached or generated chunk first
       this.generator.generateChunk(chunk);
       this.chunks.set(key, chunk);
       loaded.push(chunk);
+      
+      // Trigger an async load from database if activeWorldId is set
+      if (this.activeWorldId) {
+        import('../save/WorldDatabase').then(({ WorldDatabase }) => {
+          WorldDatabase.loadChunk(this.activeWorldId!, mc.cx, mc.cz).then(data => {
+            if (data) {
+              chunk.deserialize(data);
+              // Trigger a dirty flag for the chunk mesh to update
+              chunk.isDirty = true;
+            }
+          });
+        }).catch(err => {
+          console.warn('Failed to dynamically import WorldDatabase for chunk load:', err);
+        });
+      }
+
       // Limit chunk generation to 1 per frame to prevent freezing the main thread and OOM crashes on mobile
       if (loaded.length >= 1) {
         break;
@@ -136,14 +157,33 @@ export class ChunkManager {
   }
 
   /**
-   * Force-generates a chunk immediately (synchronous, bypasses the 1-per-frame limit).
+   * Force-generates a chunk immediately (bypasses the 1-per-frame limit).
+   * Attempts to load saved chunk data from WorldDatabase before generating procedural terrain.
    * Call this before initSpawn to guarantee the spawn column is available.
    */
-  public forceLoadChunk(cx: number, cz: number): void {
+  public async forceLoadChunk(cx: number, cz: number, worldId?: string): Promise<void> {
     const key = this.getChunkKey(cx, cz);
     if (!this.chunks.has(key)) {
       const chunk = new Chunk(cx, cz);
-      this.generator.generateChunk(chunk);
+      
+      let loaded = false;
+      if (worldId) {
+        try {
+          const { WorldDatabase } = await import('../save/WorldDatabase');
+          const data = await WorldDatabase.loadChunk(worldId, cx, cz);
+          if (data) {
+            chunk.deserialize(data);
+            loaded = true;
+          }
+        } catch (e) {
+          console.warn('Failed to load saved chunk from IndexedDB, generating procedurally...', e);
+        }
+      }
+      
+      if (!loaded) {
+        this.generator.generateChunk(chunk);
+      }
+      
       this.chunks.set(key, chunk);
     }
   }
