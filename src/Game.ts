@@ -222,7 +222,11 @@ export class Game {
 
     // Pre-load surrounding chunks around player spawn position
     eventBus.emit('loading_progress', 'Building landscape chunks...', 70);
-    this.chunkManager.update(this.player.position.x, this.player.position.z);
+    
+    // Warm up the core 3x3 chunks immediately before starting the loop so the player has somewhere to stand safely
+    for (let i = 0; i < 9; i++) {
+      this.chunkManager.update(this.player.position.x, this.player.position.z);
+    }
     
     // Mesh all active chunks on initial load to ensure the spawn chunks are rendered before gameplay begins
     const activeChunks = this.chunkManager.getActiveChunks();
@@ -285,14 +289,10 @@ export class Game {
   }
 
   private async preloadSpawnChunks(spawnX: number, spawnZ: number): Promise<void> {
-    const chunkX = Math.floor(spawnX / 16);
-    const chunkZ = Math.floor(spawnZ / 16);
-    // Force generation of the 3x3 initial spawn grid
-    for (let x = -1; x <= 1; x++) {
-      for (let z = -1; z <= 1; z++) {
-         this.chunkManager.getChunk(chunkX + x, chunkZ + z);
-      }
-    }
+    // Generate chunks synchronously around the spawn point
+    this.chunkManager.update(spawnX, spawnZ);
+    // Wait a brief moment to ensure block arrays are accessible
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
 
   private giveStarterKit(): void {

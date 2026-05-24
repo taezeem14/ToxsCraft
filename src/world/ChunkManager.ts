@@ -89,11 +89,14 @@ export class ChunkManager {
     const unloaded: string[] = [];
     const keepKeys = new Set<string>();
 
+    const missingChunks: {cx: number, cz: number, distSq: number}[] = [];
+
     // Load chunks inside render distance circle
     for (let dz = -this.renderDistance; dz <= this.renderDistance; dz++) {
       for (let dx = -this.renderDistance; dx <= this.renderDistance; dx++) {
+        const distSq = dx * dx + dz * dz;
         // Distance check (circle loading rather than square)
-        if (dx * dx + dz * dz > this.renderDistance * this.renderDistance) continue;
+        if (distSq > this.renderDistance * this.renderDistance) continue;
 
         const cx = pcx + dx;
         const cz = pcz + dz;
@@ -101,11 +104,23 @@ export class ChunkManager {
         keepKeys.add(key);
 
         if (!this.chunks.has(key)) {
-          const chunk = new Chunk(cx, cz);
-          this.generator.generateChunk(chunk);
-          this.chunks.set(key, chunk);
-          loaded.push(chunk);
+          missingChunks.push({ cx, cz, distSq });
         }
+      }
+    }
+
+    // Sort missing chunks by distance to player so closest ones load first!
+    missingChunks.sort((a, b) => a.distSq - b.distSq);
+
+    for (const mc of missingChunks) {
+      const key = this.getChunkKey(mc.cx, mc.cz);
+      const chunk = new Chunk(mc.cx, mc.cz);
+      this.generator.generateChunk(chunk);
+      this.chunks.set(key, chunk);
+      loaded.push(chunk);
+      // Limit chunk generation to 1 per frame to prevent freezing the main thread and OOM crashes on mobile
+      if (loaded.length >= 1) {
+        break;
       }
     }
 

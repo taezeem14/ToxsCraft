@@ -51,8 +51,8 @@ export class Renderer {
       precision: "mediump"
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    // Cap pixel ratio to 1 for software renderers and mobile performance
-    this.renderer.setPixelRatio(1);
+    // Use device pixel ratio clamped to max 1.5 to fix cooked aspect ratios while maintaining performance
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     const shadows = settingsManager.getValue('shadows');
     this.renderer.shadowMap.enabled = shadows;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
