@@ -200,20 +200,33 @@ export class Game {
       eventBus.emit('loading_progress', 'Generating spawn column...', 50);
 
       // A simple loop to find the highest non-air block near 0,0
-      const spawnX = 0;
-      const spawnZ = 0;
+      let spawnX = 0;
+      let spawnZ = 0;
       let spawnY = 255;
       
-      // Load/Generate the center chunk fully first
-      await this.preloadSpawnChunks(spawnX, spawnZ);
-
-      // Find surface y - skip water (id 8 and 9)
-      while (spawnY > 0) {
-        const blockId = this.chunkManager.getBlock(spawnX, spawnY, spawnZ);
-        if (blockId !== 0 && blockId !== 8 && blockId !== 9) {
-          break;
+      // Keep moving generation point until we find a non-ocean column (rough check using block height vs sea level, or just step forward until it's land)
+      // Fast check: we just generate chunks incrementally until we are above sea level (63).
+      let attempt = 0;
+      while (attempt < 50) {
+        await this.preloadSpawnChunks(spawnX, spawnZ);
+        spawnY = 255;
+        // Find surface y - skip water (id 8 and 9)
+        while (spawnY > 0) {
+          const blockId = this.chunkManager.getBlock(spawnX, spawnY, spawnZ);
+          if (blockId !== 0 && blockId !== 8 && blockId !== 9) {
+            break;
+          }
+          spawnY--;
         }
-        spawnY--;
+
+        if (spawnY >= 63) { // It's land! Sea level is 63
+          break; // Good spawn
+        }
+
+        // Try another spot further out
+        spawnX += 16 * 3; // Jump 3 chunks out
+        spawnZ += 16 * 1;
+        attempt++;
       }
 
       this.player.position.set(spawnX + 0.5, spawnY + 2.0, spawnZ + 0.5);

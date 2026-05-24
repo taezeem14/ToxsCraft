@@ -228,19 +228,10 @@ export class GreedyMesher {
               dest.positions.push(vx, vy, vz);
               dest.normals.push(norm[0], norm[1], norm[2]);
 
-              // Pass original atlas bounds + the number of repeated tiles for the shader to modulo
-              // Because we can only pass standard attributes, we'll pack the texture local UVs and max UV bounds.
-              // Wait, instead of rewriting the shader, how about we just make GreedyMesher NOT merge faces for blocks with textures?
-              // That drops performance but is visually perfect. Let's do a quick vertex-based wrapped UV.. Since it's a greedy mesh spanning `w` and `h` blocks, we multiply the max UV limit
-              // so the fragment shader uses repeated modulo arithmetic to wrap the texture correctly.
-              const uScale = (i === 1 || i === 2) ? w : 0;
-              const vScale = (i === 2 || i === 3) ? h : 0;
-              
-              // We encode the local U/V repeating scale directly via interpolator
-              // (NOTE: In a standard texture atlas with standard shaders, we can't repeat via hardware UV scale if it goes >1 because it'll bleed outside the atlas cell. 
-              // Without changing the shader, the quick fix to "textures stretched" is to NOT greedy mesh horizontally/vertically if you don't have custom shaders to wrap.
-              // BUT wait, ToxsCraft uses a fragment shader `block.frag.glsl`. Let's look for how it handles UV.
-              // If it doesn't wrap, we MUST send the base UV and a wrapper UV. For now, since textures are stretched, let's fix the stretch by disabling greedy merge for the block UVs. Wait... passing `uv[2]` doesn't fix it.)
+              // UV mapping for corners
+              const uVal = i === 1 || i === 2 ? uv[2] : uv[0];
+              const vVal = i === 2 || i === 3 ? uv[3] : uv[1];
+              dest.uvs.push(uVal, vVal);
 
               // Set AO baked color (RGB same multiplier)
               const shade = aoColors[i];
