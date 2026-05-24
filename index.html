@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tox'sCraft - Voxel Sandbox Game</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Outfit:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/ui/styles/main.css">
+</head>
+<body>
+
+  <!-- WebGL Canvas Viewport -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- Crosshair Overlay -->
+  <div id="crosshair"></div>
+
+  <!-- HUD Interface -->
+  <div id="hud-overlay" class="ui-screen hidden">
+    <!-- Coordinates & F3 Debug info -->
+    <div id="debug-info" class="debug-panel">
+      <div>FPS: <span id="fps-val">60</span></div>
+      <div>XYZ: <span id="coords-val">0.0, 80.0, 0.0</span></div>
+      <div>Chunk: <span id="chunk-val">0, 0</span></div>
+      <div>Biome: <span id="biome-val">Plains</span></div>
+      <div>Time: <span id="time-val">08:00 AM</span></div>
+    </div>
+
+    <!-- Center notifications toast -->
+    <div id="toast-container"></div>
+
+    <!-- Status bars (Hearts, Hunger, Hotbar) -->
+    <div class="hud-bottom">
+      <div class="hud-status-bars">
+        <div id="health-bar" class="status-row"></div>
+        <div id="hunger-bar" class="status-row text-right"></div>
+      </div>
+      
+      <!-- 9-slot Hotbar -->
+      <div id="hotbar" class="hotbar-container">
+        <!-- Generated slots 0-8 -->
+        <div class="hotbar-slot selected" data-slot="0"></div>
+        <div class="hotbar-slot" data-slot="1"></div>
+        <div class="hotbar-slot" data-slot="2"></div>
+        <div class="hotbar-slot" data-slot="3"></div>
+        <div class="hotbar-slot" data-slot="4"></div>
+        <div class="hotbar-slot" data-slot="5"></div>
+        <div class="hotbar-slot" data-slot="6"></div>
+        <div class="hotbar-slot" data-slot="7"></div>
+        <div class="hotbar-slot" data-slot="8"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Menu Overlay -->
+  <div id="main-menu" class="ui-screen menu-container">
+    <div class="menu-card text-center">
+      <h1 class="game-logo animate-glow">TOX'SCRAFT</h1>
+      <div class="splash-text">Procedural voxel engine!</div>
+      
+      <div class="menu-buttons">
+        <button id="btn-play" class="btn btn-primary">Singleplayer</button>
+        <button id="btn-settings" class="btn">Settings</button>
+        <button id="btn-credits" class="btn">Credits</button>
+      </div>
+      <div class="footer-tag">Tox'sCraft Engine v1.0.0</div>
+    </div>
+  </div>
+
+  <!-- World Selection Screen -->
+  <div id="world-select" class="ui-screen menu-container hidden">
+    <div class="menu-card wide">
+      <h2>Select World</h2>
+      <div id="worlds-list" class="scroll-list">
+        <!-- Chunks list inserted dynamically -->
+      </div>
+      <div class="menu-actions">
+        <button id="btn-new-world" class="btn btn-primary">Create New World</button>
+        <button id="btn-select-back" class="btn">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- World Creation Screen -->
+  <div id="world-create" class="ui-screen menu-container hidden">
+    <div class="menu-card">
+      <h2>Create World</h2>
+      <div class="form-group">
+        <label>World Name</label>
+        <input type="text" id="input-world-name" value="New World" placeholder="Enter world name...">
+      </div>
+      <div class="form-group">
+        <label>Seed</label>
+        <input type="text" id="input-world-seed" value="" placeholder="Random seed (leave blank)...">
+      </div>
+      <div class="form-group">
+        <label>Game Mode</label>
+        <select id="select-game-mode">
+          <option value="survival">Survival</option>
+          <option value="creative">Creative</option>
+        </select>
+      </div>
+      <div class="menu-actions">
+        <button id="btn-create-submit" class="btn btn-primary">Create</button>
+        <button id="btn-create-back" class="btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pause Screen Overlay -->
+  <div id="pause-screen" class="ui-screen pause-container hidden">
+    <div class="menu-card text-center">
+      <h2>Game Paused</h2>
+      <div class="menu-buttons">
+        <button id="btn-resume" class="btn btn-primary">Resume Game</button>
+        <button id="btn-settings-pause" class="btn">Settings</button>
+        <button id="btn-quit" class="btn">Save & Quit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Menu -->
+  <div id="settings-screen" class="ui-screen menu-container hidden">
+    <div class="menu-card">
+      <h2>Settings</h2>
+      
+      <div class="settings-grid">
+        <div class="setting-item">
+          <label>Field of View (FOV): <span id="val-fov">75</span></label>
+          <input type="range" id="slide-fov" min="50" max="110" value="75">
+        </div>
+        <div class="setting-item">
+          <label>Mouse Sensitivity: <span id="val-sens">50</span></label>
+          <input type="range" id="slide-sens" min="10" max="100" value="50">
+        </div>
+        <div class="setting-item">
+          <label>Master Volume: <span id="val-vol">80%</span></label>
+          <input type="range" id="slide-vol" min="0" max="100" value="80">
+        </div>
+        <div class="setting-item">
+          <label>Toggle Post-Processing</label>
+          <input type="checkbox" id="check-post" checked>
+        </div>
+        <div class="setting-item">
+          <label>Show Coordinates (F3)</label>
+          <input type="checkbox" id="check-coords" checked>
+        </div>
+      </div>
+
+      <div class="menu-actions">
+        <button id="btn-settings-save" class="btn btn-primary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Screen Overlay -->
+  <div id="loading-screen" class="ui-screen loading-container hidden">
+    <div class="loading-box text-center">
+      <h2 id="loading-status">Generating Terrain...</h2>
+      <div class="progress-bar">
+        <div id="progress-fill" style="width: 10%"></div>
+      </div>
+      <div id="loading-tip" class="splash-text">Tip: Double tap space to toggle flying!</div>
+    </div>
+  </div>
+
+  <!-- Inventory Overlay (E key) -->
+  <div id="inventory-screen" class="ui-screen inventory-container hidden">
+    <div class="inventory-card">
+      <div class="inventory-header">
+        <h2>Inventory</h2>
+        <button id="btn-close-inventory" class="close-btn">×</button>
+      </div>
+      
+      <div class="inventory-layout">
+        <!-- 27 Main slots and 9 hotbar slots -->
+        <div class="inventory-main-section">
+          <h3>Storage</h3>
+          <div id="inventory-slots-grid" class="slots-grid">
+            <!-- Dynamic Slots 9-35 -->
+          </div>
+          
+          <h3>Hotbar</h3>
+          <div id="inventory-hotbar-grid" class="slots-grid">
+            <!-- Dynamic Slots 0-8 -->
+          </div>
+        </div>
+
+        <!-- Crafting Grid Overlay -->
+        <div class="inventory-crafting-section">
+          <h3>Crafting</h3>
+          <div class="crafting-block">
+            <div id="crafting-grid" class="craft-grid-2x2">
+              <div class="craft-slot" data-index="0"></div>
+              <div class="craft-slot" data-index="1"></div>
+              <div class="craft-slot" data-index="2"></div>
+              <div class="craft-slot" data-index="3"></div>
+            </div>
+            <div class="craft-arrow">→</div>
+            <div id="crafting-output" class="craft-slot output"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Death Screen Overlay -->
+  <div id="death-screen" class="ui-screen death-container hidden">
+    <div class="menu-card text-center red-border">
+      <h1 class="red-text animate-pulse">You Died!</h1>
+      <p id="death-msg">You suffocated or fell in lava.</p>
+      <div class="menu-buttons">
+        <button id="btn-respawn" class="btn btn-primary red-bg">Respawn</button>
+        <button id="btn-death-quit" class="btn">Quit to Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Credits Screen -->
+  <div id="credits-screen" class="ui-screen menu-container hidden">
+    <div class="menu-card text-center">
+      <h2>Tox'sCraft Credits</h2>
+      <p class="credit-author">Developed by Antigravity IDE</p>
+      <p>Procedural Voxel Engine utilizing Three.js and WebGL.</p>
+      <p>Synth Audio powered by Web Audio API.</p>
+      <p>Special thanks to the Google DeepMind team!</p>
+      <div class="menu-actions">
+        <button id="btn-credits-back" class="btn">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cursor Held Item Tracking -->
+  <div id="cursor-item" class="item-icon-held hidden"></div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

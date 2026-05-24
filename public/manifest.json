@@ -1,0 +1,10 @@
+{
+  "short_name": "ToxsCraft",
+  "name": "Tox'sCraft Voxel Engine",
+  "icons": [],
+  "start_url": "/",
+  "background_color": "#0b0b11",
+  "theme_color": "#e8c96d",
+  "display": "standalone",
+  "orientation": "landscape"
+}

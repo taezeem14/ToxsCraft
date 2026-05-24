@@ -1,0 +1,140 @@
+/**
+ * Tox'sCraft ChunkManager
+ * Coordinates chunk life-cycles (generate, load, unload) around the player's position.
+ * Handles cross-chunk boundaries getBlock/setBlock queries.
+ */
+
+import { CHUNK_SIZE } from '../constants';
+import { Chunk } from './Chunk';
+import { WorldGenerator } from './generation/WorldGenerator';
+
+export class ChunkManager {
+  private chunks: Map<string, Chunk> = new Map();
+  private generator: WorldGenerator;
+  private renderDistance = 8;
+  constructor(seed: string, renderDistance = 8) {
+    this.renderDistance = renderDistance;
+    this.generator = new WorldGenerator(seed);
+  }
+
+  private getChunkKey(cx: number, cz: number): string {
+    return `${cx},${cz}`;
+  }
+
+  /**
+   * Translates absolute block coordinates to chunk coordinates
+   */
+  public getChunkCoords(wx: number, wz: number): { cx: number; cz: number; lx: number; lz: number } {
+    const cx = Math.floor(wx / CHUNK_SIZE);
+    const cz = Math.floor(wz / CHUNK_SIZE);
+    const lx = ((wx % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+    const lz = ((wz % CHUNK_SIZE) + CHUNK_SIZE) % CHUNK_SIZE;
+    return { cx, cz, lx, lz };
+  }
+
+  /**
+   * Get loaded chunk by coordinates
+   */
+  public getChunk(cx: number, cz: number): Chunk | undefined {
+    return this.chunks.get(this.getChunkKey(cx, cz));
+  }
+
+  /**
+   * Get all loaded chunks
+   */
+  public getActiveChunks(): Chunk[] {
+    return Array.from(this.chunks.values());
+  }
+
+  /**
+   * Get block ID at world absolute coordinates
+   */
+  public getBlock(wx: number, wy: number, wz: number): number {
+    const { cx, cz, lx, lz } = this.getChunkCoords(wx, wz);
+    const chunk = this.getChunk(cx, cz);
+    if (!chunk) return 0; // Air for unloaded
+    return chunk.getBlock(lx, wy, lz);
+  }
+
+  /**
+   * Set block ID at world absolute coordinates, dirtying chunk + neighbors
+   */
+  public setBlock(wx: number, wy: number, wz: number, id: number): void {
+    const { cx, cz, lx, lz } = this.getChunkCoords(wx, wz);
+    const chunk = this.getChunk(cx, cz);
+    if (!chunk) return;
+
+    chunk.setBlock(lx, wy, lz, id);
+
+    // If block is at chunk edge, flag neighboring chunks as dirty to refresh borders
+    if (lx === 0) this.dirtyChunk(cx - 1, cz);
+    if (lx === CHUNK_SIZE - 1) this.dirtyChunk(cx + 1, cz);
+    if (lz === 0) this.dirtyChunk(cx, cz - 1);
+    if (lz === CHUNK_SIZE - 1) this.dirtyChunk(cx, cz + 1);
+  }
+
+  private dirtyChunk(cx: number, cz: number): void {
+    const neighbor = this.getChunk(cx, cz);
+    if (neighbor) neighbor.isDirty = true;
+  }
+
+  /**
+   * Update loaded chunks based on player coordinates
+   */
+  public update(playerX: number, playerZ: number): { loaded: Chunk[]; unloaded: string[] } {
+    const pcx = Math.floor(playerX / CHUNK_SIZE);
+    const pcz = Math.floor(playerZ / CHUNK_SIZE);
+    
+    const loaded: Chunk[] = [];
+    const unloaded: string[] = [];
+    const keepKeys = new Set<string>();
+
+    // Load chunks inside render distance circle
+    for (let dz = -this.renderDistance; dz <= this.renderDistance; dz++) {
+      for (let dx = -this.renderDistance; dx <= this.renderDistance; dx++) {
+        // Distance check (circle loading rather than square)
+        if (dx * dx + dz * dz > this.renderDistance * this.renderDistance) continue;
+
+        const cx = pcx + dx;
+        const cz = pcz + dz;
+        const key = this.getChunkKey(cx, cz);
+        keepKeys.add(key);
+
+        if (!this.chunks.has(key)) {
+          const chunk = new Chunk(cx, cz);
+          this.generator.generateChunk(chunk);
+          this.chunks.set(key, chunk);
+          loaded.push(chunk);
+        }
+      }
+    }
+
+    // Unload far chunks
+    for (const key of this.chunks.keys()) {
+      if (!keepKeys.has(key)) {
+        unloaded.push(key);
+        this.chunks.delete(key);
+      }
+    }
+
+    return { loaded, unloaded };
+  }
+
+  /**
+   * Checks if coordinates are loaded
+   */
+  public isChunkLoaded(cx: number, cz: number): boolean {
+    return this.chunks.has(this.getChunkKey(cx, cz));
+  }
+
+  /**
+   * Set new render distance
+   */
+  public setRenderDistance(distance: number): void {
+    this.renderDistance = distance;
+  }
+
+  public clear(): void {
+    this.chunks.clear();
+  }
+}

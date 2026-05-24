@@ -1,0 +1,24 @@
+{
+  "name": "toxscraft",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "howler": "^2.2.4",
+    "idb": "^8.0.1",
+    "simplex-noise": "^4.0.1",
+    "three": "^0.160.0"
+  },
+  "devDependencies": {
+    "@types/howler": "^2.2.11",
+    "@types/three": "^0.160.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.12",
+    "vite-plugin-glsl": "^1.2.1"
+  }
+}
