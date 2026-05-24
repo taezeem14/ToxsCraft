@@ -18,6 +18,7 @@ import { eventBus } from './EventBus';
 import { getBlock } from './world/BlockRegistry';
 import { createItemStack } from './inventory/ItemStack';
 import { AssetLoader } from './core/AssetLoader';
+import { MobManager } from './mobs/MobManager';
 
 // Helper mapping inventory item IDs to block placement IDs
 const BLOCK_PLACEMENT_MAP: { [key: string]: number } = {
@@ -62,6 +63,7 @@ export class Game {
   public movementController!: MovementController;
   public inputManager!: InputManager;
   public dayNightCycle!: DayNightCycle;
+  public mobManager!: MobManager;
 
   // Active Save World State
   public activeWorld: WorldMetadata | null = null;
@@ -189,6 +191,8 @@ export class Game {
     eventBus.emit('loading_progress', 'Synthesizing ambient cues...', 90);
     AssetLoader.playProceduralMusic();
 
+    this.mobManager = new MobManager(this.renderer.scene);
+
     // Start Loops
     this.isPaused = false;
     this.isRunning = true;
@@ -256,6 +260,7 @@ export class Game {
       // Input, Physics & Movement Slide
       this.movementController.update(deltaSec);
       this.player.update(deltaSec);
+      this.mobManager.update(deltaSec, this.player, this.chunkManager);
 
       // Async Chunk Loading update around player
       const updates = this.chunkManager.update(this.player.position.x, this.player.position.z);
@@ -462,5 +467,6 @@ export class Game {
     this.inputManager.destroy();
     this.renderer.clear();
     this.chunkManager.clear();
+    if (this.mobManager) this.mobManager.clear();
   }
 }
