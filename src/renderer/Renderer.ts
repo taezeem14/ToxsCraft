@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { CHUNK_SIZE } from '../constants';
 import { AssetLoader } from '../core/AssetLoader';
 import { SkySystem } from './SkySystem';
+import { settingsManager } from '../core/SettingsManager';
 import blockVertShader from './shaders/block.vert.glsl';
 import blockFragShader from './shaders/block.frag.glsl';
 import waterVertShader from './shaders/water.vert.glsl';
@@ -51,7 +52,8 @@ export class Renderer {
     });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.shadowMap.enabled = true;
+    const shadows = settingsManager.getValue('shadows');
+    this.renderer.shadowMap.enabled = shadows;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     // Load textures
@@ -70,8 +72,9 @@ export class Renderer {
     this.scene.add(this.ambientLight);
 
     // Sun Directional Light
+    const shadows = settingsManager.getValue('shadows');
     this.dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    this.dirLight.castShadow = true;
+    this.dirLight.castShadow = shadows;
     this.dirLight.shadow.mapSize.width = 1024;
     this.dirLight.shadow.mapSize.height = 1024;
     this.dirLight.shadow.camera.near = 0.5;
@@ -232,6 +235,18 @@ export class Renderer {
 
     // 4. Render main scene pass
     this.renderer.render(this.scene, this.camera);
+  }
+
+  public setShadowsEnabled(enabled: boolean): void {
+    this.renderer.shadowMap.enabled = enabled;
+    this.dirLight.castShadow = enabled;
+    
+    // Update existing chunk meshes
+    for (const mesh of this.solidMeshes.values()) {
+      mesh.castShadow = enabled;
+      mesh.receiveShadow = enabled;
+      mesh.customDepthMaterial = undefined;
+    }
   }
 
   public clear(): void {

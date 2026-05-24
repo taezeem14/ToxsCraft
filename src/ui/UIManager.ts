@@ -168,23 +168,19 @@ export class UIManager {
     const sensSlider = document.getElementById('slide-sens') as HTMLInputElement;
     const volSlider = document.getElementById('slide-vol') as HTMLInputElement;
     const postCheck = document.getElementById('check-post') as HTMLInputElement;
+    const shadowsCheck = document.getElementById('check-shadows') as HTMLInputElement;
+    const renderSlider = document.getElementById('slide-render') as HTMLInputElement;
     const coordsCheck = document.getElementById('check-coords') as HTMLInputElement;
-
-    // Load initial values
-    const settings = settingsManager.get();
-    fovSlider.value = settings.fov.toString();
-    sensSlider.value = (settings.mouseSensitivity * 25000).toString();
-    volSlider.value = (settings.volumeMaster * 100).toString();
-    postCheck.checked = settings.postProcessing;
-    coordsCheck.checked = settings.showCoordinates;
 
     // Events
     fovSlider.addEventListener('input', () => {
       const val = parseInt(fovSlider.value);
       document.getElementById('val-fov')!.textContent = val.toString();
       settingsManager.set('fov', val);
-      this.game.renderer.camera.fov = val;
-      this.game.renderer.camera.updateProjectionMatrix();
+      if (this.game.renderer && this.game.renderer.camera) {
+        this.game.renderer.camera.fov = val;
+        this.game.renderer.camera.updateProjectionMatrix();
+      }
     });
 
     sensSlider.addEventListener('input', () => {
@@ -203,6 +199,22 @@ export class UIManager {
       settingsManager.set('postProcessing', postCheck.checked);
     });
 
+    shadowsCheck.addEventListener('change', () => {
+      settingsManager.set('shadows', shadowsCheck.checked);
+      if (this.game.renderer) {
+        this.game.renderer.setShadowsEnabled(shadowsCheck.checked);
+      }
+    });
+
+    renderSlider.addEventListener('input', () => {
+      const val = parseInt(renderSlider.value);
+      document.getElementById('val-render')!.textContent = val.toString();
+      settingsManager.set('renderDistance', val);
+      if (this.game.chunkManager) {
+        this.game.chunkManager.setRenderDistance(val);
+      }
+    });
+
     coordsCheck.addEventListener('change', () => {
       settingsManager.set('showCoordinates', coordsCheck.checked);
       if (coordsCheck.checked) {
@@ -219,6 +231,69 @@ export class UIManager {
         this.showScreen('mainMenu');
       }
     });
+
+    // Run initial sync
+    this.syncSettingsUI();
+  }
+
+  public syncSettingsUI(): void {
+    const fovSlider = document.getElementById('slide-fov') as HTMLInputElement;
+    const sensSlider = document.getElementById('slide-sens') as HTMLInputElement;
+    const volSlider = document.getElementById('slide-vol') as HTMLInputElement;
+    const postCheck = document.getElementById('check-post') as HTMLInputElement;
+    const shadowsCheck = document.getElementById('check-shadows') as HTMLInputElement;
+    const renderSlider = document.getElementById('slide-render') as HTMLInputElement;
+    const coordsCheck = document.getElementById('check-coords') as HTMLInputElement;
+
+    const settings = settingsManager.get();
+    if (fovSlider) {
+      fovSlider.value = settings.fov.toString();
+      const valFov = document.getElementById('val-fov');
+      if (valFov) valFov.textContent = settings.fov.toString();
+    }
+    if (sensSlider) {
+      sensSlider.value = (settings.mouseSensitivity * 25000).toString();
+      const valSens = document.getElementById('val-sens');
+      if (valSens) valSens.textContent = Math.round(settings.mouseSensitivity * 25000).toString();
+    }
+    if (volSlider) {
+      volSlider.value = (settings.volumeMaster * 100).toString();
+      const valVol = document.getElementById('val-vol');
+      if (valVol) valVol.textContent = `${Math.round(settings.volumeMaster * 100)}%`;
+    }
+    if (postCheck) postCheck.checked = settings.postProcessing;
+    if (shadowsCheck) shadowsCheck.checked = settings.shadows;
+    if (renderSlider) {
+      renderSlider.value = settings.renderDistance.toString();
+      const valRender = document.getElementById('val-render');
+      if (valRender) valRender.textContent = settings.renderDistance.toString();
+    }
+    if (coordsCheck) {
+      coordsCheck.checked = settings.showCoordinates;
+      if (settings.showCoordinates) {
+        this.debugPanel.classList.remove('hidden');
+      } else {
+        this.debugPanel.classList.add('hidden');
+      }
+    }
+  }
+
+  public showToast(message: string): void {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const el = document.createElement('div');
+    el.className = 'toast';
+    el.textContent = message;
+    
+    container.appendChild(el);
+    
+    // Auto-remove after 3 seconds
+    setTimeout(() => {
+      el.style.opacity = '0';
+      el.style.transition = 'opacity 0.5s ease';
+      setTimeout(() => el.remove(), 500);
+    }, 3000);
   }
 
   private initHUD(): void {
@@ -228,6 +303,12 @@ export class UIManager {
     eventBus.on('inventory_update', () => {
       this.drawHUDVitals();
       this.drawHotbarSelection();
+    });
+    eventBus.on('show_toast', (msg: string) => {
+      this.showToast(msg);
+    });
+    eventBus.on('settings_changed', () => {
+      this.syncSettingsUI();
     });
 
     // F3 debug key bindings toggle

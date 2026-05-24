@@ -19,6 +19,7 @@ import { getBlock } from './world/BlockRegistry';
 import { createItemStack } from './inventory/ItemStack';
 import { AssetLoader } from './core/AssetLoader';
 import { MobManager } from './mobs/MobManager';
+import { settingsManager } from './core/SettingsManager';
 
 // Helper mapping inventory item IDs to block placement IDs
 const BLOCK_PLACEMENT_MAP: { [key: string]: number } = {
@@ -80,6 +81,15 @@ export class Game {
   private selectionBox!: THREE.LineSegments;
   private miningProgress = 0;
   private miningTarget: { x: number; y: number; z: number } | null = null;
+
+  // FPS calculation
+  private fpsFrameCount = 0;
+  private fpsLastTime = 0;
+  private currentFps = 60;
+
+  // Performance degradation tracking
+  private lowFpsStreak = 0;
+  private performanceDowngraded = false;
 
   constructor(canvas: HTMLCanvasElement) {
     // 1. Core Scaffolding
@@ -147,7 +157,7 @@ export class Game {
     await WorldDatabase.init();
 
     eventBus.emit('loading_progress', 'Initializing chunk indices...', 30);
-    this.chunkManager = new ChunkManager(world.seed, 8);
+    this.chunkManager = new ChunkManager(world.seed, settingsManager.getValue('renderDistance'));
 
     // Try loading player save profile
     const savedPlayer = await WorldDatabase.loadPlayer(world.id);
@@ -247,6 +257,31 @@ export class Game {
 
     let deltaSec = (now - this.lastTime) * 0.001;
     this.lastTime = now;
+
+    // Track FPS
+    this.fpsFrameCount++;
+    if (this.fpsLastTime === 0) this.fpsLastTime = now;
+    if (now - this.fpsLastTime >= 1000) {
+      this.currentFps = Math.round((this.fpsFrameCount * 1000) / (now - this.fpsLastTime));
+      this.fpsFrameCount = 0;
+      this.fpsLastTime = now;
+      
+      const fpsEl = document.getElementById('fps-val');
+      if (fpsEl) {
+        fpsEl.textContent = this.currentFps.toString();
+      }
+
+      // Dynamic Performance Degradation:
+      // If FPS drops below 25 for 5 consecutive seconds, trigger downgrade
+      if (this.currentFps < 25 && !this.isPaused && !this.player.isDead) {
+        this.lowFpsStreak++;
+        if (this.lowFpsStreak >= 5 && !this.performanceDowngraded) {
+          this.downgradeGraphics();
+        }
+      } else {
+        this.lowFpsStreak = 0;
+      }
+    }
 
     // Guard against massive frame lags
     if (deltaSec > 0.1) deltaSec = 0.1;
@@ -459,6 +494,44 @@ export class Game {
     }
     
     eventBus.emit('pause_toggle', this.isPaused);
+  }
+
+  private downgradeGraphics(): void {
+    this.performanceDowngraded = true;
+    
+    let changed = false;
+    let messages: string[] = [];
+
+    if (settingsManager.getValue('shadows')) {
+      settingsManager.set('shadows', false);
+      this.renderer.setShadowsEnabled(false);
+      changed = true;
+      messages.push('shadows off');
+    }
+    
+    if (settingsManager.getValue('postProcessing')) {
+      settingsManager.set('postProcessing', false);
+      changed = true;
+      messages.push('effects off');
+    }
+
+    const currentDist = settingsManager.getValue('renderDistance');
+    if (currentDist > 4) {
+      settingsManager.set('renderDistance', 4);
+      this.chunkManager.setRenderDistance(4);
+      changed = true;
+      messages.push('render distance 4');
+    } else if (currentDist > 3) {
+      settingsManager.set('renderDistance', 3);
+      this.chunkManager.setRenderDistance(3);
+      changed = true;
+      messages.push('render distance 3');
+    }
+
+    if (changed) {
+      eventBus.emit('show_toast', `Performance Optimized: ${messages.join(', ')}`);
+      eventBus.emit('settings_changed');
+    }
   }
 
   public stop(): void {

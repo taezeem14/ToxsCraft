@@ -20,14 +20,14 @@ export interface GameSettings {
 
 const DEFAULT_SETTINGS: GameSettings = {
   fov: 75,
-  renderDistance: 8,
+  renderDistance: 4,
   mouseSensitivity: 0.002,
   volumeMaster: 0.8,
   volumeMusic: 0.5,
   volumeAmbient: 0.6,
   volumeEffects: 0.8,
-  postProcessing: true,
-  shadows: true,
+  postProcessing: false,
+  shadows: false,
   viewBobbing: true,
   autoJump: false,
   showCoordinates: true
