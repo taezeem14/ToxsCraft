@@ -239,10 +239,19 @@ export class GreedyMesher {
             }
 
             // Write index patterns (two triangles per quad)
-            dest.indices.push(
-              ind, ind + 1, ind + 2,
-              ind, ind + 2, ind + 3
-            );
+            // If isBack is true (faces pointing towards negative axes), we invert the winding order
+            // to prevent backface culling from hiding the face when viewed from the outside.
+            if (isBack) {
+              dest.indices.push(
+                ind, ind + 2, ind + 1,
+                ind, ind + 3, ind + 2
+              );
+            } else {
+              dest.indices.push(
+                ind, ind + 1, ind + 2,
+                ind, ind + 2, ind + 3
+              );
+            }
 
             if (isFluidBlock) {
               transIndexCount += 4;
