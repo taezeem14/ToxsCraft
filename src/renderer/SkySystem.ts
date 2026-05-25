@@ -97,7 +97,7 @@ export class SkySystem {
     this.stars.position.copy(playerPos);
 
     // Calculate sun orbit angle (revolve around Z-axis)
-    const angle = time * Math.PI * 2 + Math.PI; // offset so 0.0 is morning
+    const angle = time * Math.PI * 2;
     const sunDir = new THREE.Vector3(
       Math.cos(angle),
       Math.sin(angle),

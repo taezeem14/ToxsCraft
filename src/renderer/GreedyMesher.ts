@@ -239,9 +239,13 @@ export class GreedyMesher {
             }
 
             // Write index patterns (two triangles per quad)
-            // If isBack is true (faces pointing towards negative axes), we invert the winding order
-            // to prevent backface culling from hiding the face when viewed from the outside.
-            if (isBack) {
+            // Determine winding order to ensure all face polygons are counter-clockwise (CCW)
+            // when viewed from the outside (preventing them from being culled by the GPU).
+            // - Z axis: isBack (Z-) is CW in standard layout, Z+ is CCW. So invert for Z-.
+            // - X and Y axes: the mapping of plane coords to 3D axes inverts the default orientation.
+            //   So X+ and Y+ are CW, while X- and Y- are CCW. We must invert winding for X+ and Y+ (i.e. !isBack).
+            const invertWinding = (axis === 2) ? isBack : !isBack;
+            if (invertWinding) {
               dest.indices.push(
                 ind, ind + 2, ind + 1,
                 ind, ind + 3, ind + 2
