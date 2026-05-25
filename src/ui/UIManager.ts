@@ -417,6 +417,17 @@ export class UIManager {
   private drawHUDVitals(): void {
     const healthRow = document.getElementById('health-bar')!;
     const hungerRow = document.getElementById('hunger-bar')!;
+    const statusContainer = document.querySelector('.hud-status-bars') as HTMLElement;
+    const xpContainer = document.querySelector('.xp-container') as HTMLElement;
+
+    if (this.game.player && this.game.player.isCreative) {
+      if (statusContainer) statusContainer.style.display = 'none';
+      if (xpContainer) xpContainer.style.display = 'none';
+      return;
+    } else {
+      if (statusContainer) statusContainer.style.display = 'flex';
+      if (xpContainer) xpContainer.style.display = 'flex';
+    }
 
     // 10 hearts maximum (20 HP)
     let hpStr = '';
@@ -495,11 +506,18 @@ export class UIManager {
 
   private getItemColor(itemId: string): string {
     if (itemId.includes('pickaxe')) return '#5f9ea0';
+    if (itemId.includes('sword')) return '#48c9b0';
+    if (itemId.includes('axe')) return '#a569bd';
+    if (itemId.includes('shovel')) return '#f5b041';
+    if (itemId === 'flint_and_steel') return '#7f8c8d';
     if (itemId.includes('stone') || itemId === 'cobblestone') return '#7f8c8d';
     if (itemId === 'dirt') return '#8b5a2b';
     if (itemId === 'grass_block') return '#2ecc71';
     if (itemId === 'sand') return '#f1c40f';
     if (itemId === 'apple') return '#e74c3c';
+    if (itemId === 'bread') return '#f5cbf7';
+    if (itemId === 'cooked_beef') return '#a04000';
+    if (itemId === 'cooked_porkchop') return '#f5b041';
     if (itemId === 'torch') return '#e67e22';
     if (itemId === 'oak_log') return '#8e44ad';
     if (itemId === 'mycelium') return '#8a6c8a';
@@ -509,6 +527,18 @@ export class UIManager {
     if (itemId === 'mushroom_stem') return '#f5f5dc';
     if (itemId === 'acacia_log') return '#e67e22';
     if (itemId === 'acacia_leaves') return '#27ae60';
+    if (itemId === 'obsidian') return '#3a1f5d';
+    if (itemId === 'netherrack') return '#7f0000';
+    if (itemId === 'soul_sand') return '#4d3926';
+    if (itemId === 'nether_portal') return '#9b59b6';
+    if (itemId === 'glowstone') return '#f39c12';
+    if (itemId === 'diamond') return '#33ffff';
+    if (itemId === 'coal') return '#2c3e50';
+    if (itemId === 'raw_iron') return '#d98880';
+    if (itemId === 'raw_gold') return '#f1c40f';
+    if (itemId === 'redstone_dust') return '#c0392b';
+    if (itemId === 'emerald') return '#2ecc71';
+    if (itemId === 'lapis_lazuli') return '#2980b9';
     return '#bdc3c7'; // default light gray
   }
 
@@ -597,12 +627,66 @@ export class UIManager {
     }
   }
 
+  private drawCreativeCatalog(): void {
+    const grid = document.getElementById('creative-items-grid')!;
+    if (!grid) return;
+    grid.innerHTML = '';
+    
+    const CREATIVE_ITEMS = [
+      "stone", "cobblestone", "mossy_cobblestone", "bricks", "dirt", "grass_block", "mycelium",
+      "sand", "sandstone", "terracotta", "gravel", "oak_log", "acacia_log", "oak_leaves", "acacia_leaves",
+      "glass", "glass_pane", "white_wool", "red_wool", "green_wool", "blue_wool",
+      "pumpkin", "jack_o_lantern", "melon_block", "cactus", "sugar_cane", "lily_pad", "ladder", "cobweb", "torch", "glowstone",
+      "crafting_table", "furnace", "chest", "obsidian", "nether_portal", "netherrack", "soul_sand", "tnt",
+      "wood_pickaxe", "stone_pickaxe", "iron_pickaxe", "diamond_pickaxe",
+      "wood_sword", "stone_sword", "iron_sword", "diamond_sword",
+      "wood_axe", "stone_axe", "iron_axe", "diamond_axe",
+      "wood_shovel", "stone_shovel", "iron_shovel", "diamond_shovel",
+      "flint_and_steel", "coal", "raw_iron", "raw_gold", "diamond", "redstone_dust", "emerald", "lapis_lazuli",
+      "apple", "bread", "cooked_beef", "cooked_porkchop", "stick", "wheat_seeds",
+      "dandelion", "poppy", "brown_mushroom", "red_mushroom", "melon_slice", "string",
+      "snowball", "clay_ball", "glowstone_dust"
+    ];
+
+    for (const itemId of CREATIVE_ITEMS) {
+      const slot = document.createElement('div');
+      slot.className = 'hotbar-slot';
+      slot.title = itemId.replace(/_/g, ' ');
+      this.renderSlotItem(slot, createItemStack(itemId, 1));
+      slot.addEventListener('click', () => {
+        this.heldItem = createItemStack(itemId, 64);
+        this.cursorElement.classList.remove('hidden');
+        this.cursorElement.style.backgroundColor = this.getItemColor(this.heldItem.id);
+        this.cursorElement.style.border = '2px solid #fff';
+      });
+      grid.appendChild(slot);
+    }
+  }
+
   private drawInventorySlots(): void {
     const grid = document.getElementById('inventory-slots-grid')!;
     const hotbarGrid = document.getElementById('inventory-hotbar-grid')!;
     
     grid.innerHTML = '';
     hotbarGrid.innerHTML = '';
+
+    // Handle Creative mode layout visibility overrides
+    const creativeSection = document.getElementById('creative-catalog-section');
+    const equipmentSection = document.querySelector('.inventory-equipment-section') as HTMLElement;
+    const craftingSection = document.querySelector('.inventory-crafting-section') as HTMLElement;
+
+    if (this.game.player && this.game.player.isCreative) {
+      if (creativeSection) {
+        creativeSection.classList.remove('hidden');
+        this.drawCreativeCatalog();
+      }
+      if (equipmentSection) equipmentSection.style.display = 'none';
+      if (craftingSection) craftingSection.style.display = 'none';
+    } else {
+      if (creativeSection) creativeSection.classList.add('hidden');
+      if (equipmentSection) equipmentSection.style.display = 'block';
+      if (craftingSection) craftingSection.style.display = 'block';
+    }
 
     // Draw main storage (slots 9 to 44) - 36 slots total
     for (let i = 9; i < 45; i++) {

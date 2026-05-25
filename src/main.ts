@@ -27,4 +27,11 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Start loop
   requestAnimationFrame(loop);
+
+  // Register Service Worker for PWA support
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('PWA ServiceWorker registered:', reg.scope))
+      .catch(err => console.warn('PWA ServiceWorker failed to register:', err));
+  }
 });

@@ -8,6 +8,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Outfit:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/ui/styles/main.css">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#e8c96d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
 <body>
 
@@ -21,8 +25,13 @@
   <div id="hud-overlay" class="ui-screen hidden">
     <!-- Mobile Controls Overlay -->
     <div id="mobile-controls" class="mobile-controls hidden">
-      <div class="joystick-left" id="joystick-move">
-        <div class="joystick-knob" id="joystick-move-knob"></div>
+      <!-- D-Pad Left -->
+      <div class="dpad-left" id="dpad-move">
+        <div class="dpad-btn dpad-up" id="btn-dpad-up">▲</div>
+        <div class="dpad-btn dpad-left-arrow" id="btn-dpad-left">◀</div>
+        <div class="dpad-btn dpad-center" id="btn-dpad-center">◆</div>
+        <div class="dpad-btn dpad-right-arrow" id="btn-dpad-right">▶</div>
+        <div class="dpad-btn dpad-down" id="btn-dpad-down">▼</div>
       </div>
       <div class="mobile-buttons-right">
         <button id="btn-mobile-jump" class="mobile-btn">JUMP</button>
@@ -237,6 +246,12 @@
           </div>
         </div>
 
+        <!-- Creative Catalog Section -->
+        <div id="creative-catalog-section" class="inventory-creative-section hidden">
+          <h3>Creative Items</h3>
+          <div id="creative-items-grid" class="creative-grid"></div>
+        </div>
+
         <!-- Crafting Grid Overlay -->
         <div class="inventory-crafting-section">
           <h3>Crafting</h3>
@@ -284,10 +299,9 @@
   <div id="credits-screen" class="ui-screen menu-container hidden">
     <div class="menu-card text-center">
       <h2>Tox'sCraft Credits</h2>
-      <p class="credit-author">Developed by Antigravity IDE</p>
+      <p class="credit-author">Developed by Muhammad Taezeem Tariq Matta</p>
       <p>Procedural Voxel Engine utilizing Three.js and WebGL.</p>
       <p>Synth Audio powered by Web Audio API.</p>
-      <p>Special thanks to the Google DeepMind team!</p>
       <div class="menu-actions">
         <button id="btn-credits-back" class="btn">Back</button>
       </div>

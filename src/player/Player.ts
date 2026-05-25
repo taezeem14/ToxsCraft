@@ -19,6 +19,7 @@ export class Player {
   public eyeHeight = 1.6;
   public onGround = false;
   public isFlying = false;
+  public isCreative = false;
   public isSneaking = false;
   public isSwimming = false;
 
@@ -145,7 +146,7 @@ export class Player {
   }
 
   public takeDamage(amount: number): void {
-    if (this.isDead || this.isFlying) return; // Godmode in flying creative
+    if (this.isDead || this.isCreative) return; // Godmode in creative mode
 
     this.health = Math.max(0, this.health - amount);
     eventBus.emit('player_hurt', amount);
@@ -169,6 +170,7 @@ export class Player {
   }
 
   private drainHunger(amount: number): void {
+    if (this.isCreative) return; // No hunger decay in creative mode
     this.hunger = Math.max(0, this.hunger - amount);
     eventBus.emit('player_status_change');
 

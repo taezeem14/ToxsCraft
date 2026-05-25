@@ -172,4 +172,18 @@ export class SkySystem {
     }
     return result;
   }
+
+  public setDimension(dim: 'overworld' | 'nether'): void {
+    if (dim === 'nether') {
+      this.skyMesh.visible = false;
+      this.stars.visible = false;
+      this.dirLight.visible = false;
+      this.ambientLight.color.setRGB(0.5, 0.2, 0.2);
+      this.ambientLight.intensity = 0.45;
+    } else {
+      this.skyMesh.visible = true;
+      this.stars.visible = true;
+      this.dirLight.visible = true;
+    }
+  }
 }

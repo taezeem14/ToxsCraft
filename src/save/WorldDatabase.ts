@@ -24,6 +24,7 @@ export interface SavedPlayer {
   timeOfDay: number;
   level?: number;
   xp?: number;
+  dimension?: 'overworld' | 'nether';
 }
 
 
@@ -105,20 +106,20 @@ export class WorldDatabase {
   /**
    * Saves a chunk's block binary mapping
    */
-  public static async saveChunk(worldId: string, cx: number, cz: number, data: Uint8Array): Promise<void> {
+  public static async saveChunk(worldId: string, cx: number, cz: number, data: Uint8Array, dimension: string = 'overworld'): Promise<void> {
     await this.init();
     if (!this.db) return;
-    const key = `${worldId}_${cx}_${cz}`;
+    const key = dimension === 'nether' ? `${worldId}_nether_${cx}_${cz}` : `${worldId}_${cx}_${cz}`;
     await this.db.put('chunks', data, key);
   }
 
   /**
    * Loads a chunk's block binary mapping, returns null if not cached
    */
-  public static async loadChunk(worldId: string, cx: number, cz: number): Promise<Uint8Array | null> {
+  public static async loadChunk(worldId: string, cx: number, cz: number, dimension: string = 'overworld'): Promise<Uint8Array | null> {
     await this.init();
     if (!this.db) return null;
-    const key = `${worldId}_${cx}_${cz}`;
+    const key = dimension === 'nether' ? `${worldId}_nether_${cx}_${cz}` : `${worldId}_${cx}_${cz}`;
     const result = await this.db.get('chunks', key);
     return result || null;
   }

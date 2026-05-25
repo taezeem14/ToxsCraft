@@ -751,6 +751,17 @@ export class AssetLoader {
         }
         break;
 
+      case 81: // Nether Portal
+        // Purple/magenta swirl texture
+        gridNoise(100, 30, 150, 35);
+        ctx.fillStyle = 'rgba(255, 0, 255, 0.4)';
+        for (let i = 0; i < 15; i++) {
+          const px = Math.floor(Math.random() * 14) + 1;
+          const py = Math.floor(Math.random() * 14) + 1;
+          ctx.fillRect(x + px, y + py, 2, 2);
+        }
+        break;
+
       default: // Cobblestone / generic default
         gridNoise(100, 100, 100, 15);
         // Draw stones dividers

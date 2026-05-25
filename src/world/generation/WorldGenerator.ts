@@ -43,9 +43,104 @@ export class WorldGenerator {
   /**
    * Generates blocks and height bounds inside a chunk
    */
-  public generateChunk(chunk: Chunk): void {
+  public generateChunk(chunk: Chunk, dimension: 'overworld' | 'nether' = 'overworld'): void {
     const worldXOffset = chunk.x * CHUNK_SIZE;
     const worldZOffset = chunk.z * CHUNK_SIZE;
+
+    if (dimension === 'nether') {
+      const seaLevel = 32;
+
+      // 1. Bedrock floor, ceiling and cavern fill
+      for (let z = 0; z < CHUNK_SIZE; z++) {
+        for (let x = 0; x < CHUNK_SIZE; x++) {
+          const wx = worldXOffset + x;
+          const wz = worldZOffset + z;
+
+          chunk.setBlock(x, 0, z, 11); // Bedrock floor
+          chunk.setBlock(x, 127, z, 11); // Bedrock ceiling
+          
+          for (let y = 128; y < CHUNK_HEIGHT; y++) {
+            chunk.setBlock(x, y, z, 0); // Air above ceiling
+          }
+
+          for (let y = 1; y < 127; y++) {
+            // 3D noise for caves
+            const nv1 = this.noiseCave3D(wx * 0.02, y * 0.03, wz * 0.02);
+            const nv2 = this.noiseCave3D(wx * 0.05, y * 0.05, wz * 0.05);
+            const density = nv1 * 0.65 + nv2 * 0.35;
+
+            // Height-based density scale to keep floor/ceiling solid
+            const heightFactor = Math.sin((y / 127) * Math.PI); // 0 at ends, 1 in middle
+            const threshold = -0.1 + 0.5 * (1 - heightFactor);
+
+            if (density > threshold) {
+              if (y <= seaLevel) {
+                chunk.setBlock(x, y, z, 10); // Lava ocean (ID 10)
+              } else {
+                chunk.setBlock(x, y, z, 0); // Air cavern
+              }
+            } else {
+              chunk.setBlock(x, y, z, 53); // Netherrack (ID 53)
+            }
+          }
+        }
+      }
+
+      // 2. Soul sand & Gravel floor patches
+      for (let z = 0; z < CHUNK_SIZE; z++) {
+        for (let x = 0; x < CHUNK_SIZE; x++) {
+          const wx = worldXOffset + x;
+          const wz = worldZOffset + z;
+
+          for (let y = 2; y < 120; y++) {
+            if (chunk.getBlock(x, y, z) === 53 && chunk.getBlock(x, y + 1, z) === 0) {
+              const nSoul = this.noiseHeight2D(wx * 0.08, wz * 0.08);
+              if (nSoul > 0.35) {
+                chunk.setBlock(x, y, z, 54); // Soul sand
+                if (Math.random() > 0.4) chunk.setBlock(x, y - 1, z, 54);
+              } else if (nSoul < -0.35) {
+                chunk.setBlock(x, y, z, 5); // Gravel
+                if (Math.random() > 0.4) chunk.setBlock(x, y - 1, z, 5);
+              }
+            }
+          }
+        }
+      }
+
+      // 3. Hanging Glowstone clusters from ceiling
+      for (let z = 0; z < CHUNK_SIZE; z++) {
+        for (let x = 0; x < CHUNK_SIZE; x++) {
+          for (let y = 120; y > 15; y--) {
+            if (chunk.getBlock(x, y, z) === 0 && chunk.getBlock(x, y + 1, z) === 53) {
+              if (Math.random() < 0.015) {
+                chunk.setBlock(x, y, z, 32); // Glowstone (ID 32)
+                const clusterSize = Math.floor(Math.random() * 4) + 2;
+                for (let c = 0; c < clusterSize; c++) {
+                  const ox = x + (Math.floor(Math.random() * 3) - 1);
+                  const oy = y - Math.floor(Math.random() * 2);
+                  const oz = z + (Math.floor(Math.random() * 3) - 1);
+                  if (chunk.getBlock(ox, oy, oz) === 0) {
+                    chunk.setBlock(ox, oy, oz, 32);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // 4. Fill constant dim lighting
+      for (let z = 0; z < CHUNK_SIZE; z++) {
+        for (let x = 0; x < CHUNK_SIZE; x++) {
+          for (let y = 0; y < CHUNK_HEIGHT; y++) {
+            chunk.setSkyLight(x, y, z, 4); // Constant dim glow
+          }
+        }
+      }
+      return;
+    }
+
+    // --- OVERWORLD GENERATION ---
     const seaLevel = 63;
 
     // Phase 1: Heightmap and terrain structure filling
@@ -87,7 +182,6 @@ export class WorldGenerator {
             chunk.setBlock(x, y, z, biome.subSurfaceBlock);
           } else if (y === finalHeight) {
             // Surface block (grass/sand)
-            // If below sea level, it might need to be sand/gravel
             if (y <= seaLevel + 1 && biome.id !== 2 && biome.id !== 9 && biome.id !== 10) {
               chunk.setBlock(x, y, z, 4); // Sand at water borders
             } else {
@@ -122,7 +216,6 @@ export class WorldGenerator {
         const finalHeight = heights[x + z * CHUNK_SIZE];
 
         for (let y = 1; y < finalHeight - 5; y++) {
-          // Double octave 3D cave noise
           const cv1 = this.noiseCave3D(wx * 0.02, y * 0.03, wz * 0.02);
           const cv2 = this.noiseCave3D(wx * 0.05, y * 0.05, wz * 0.05);
           
@@ -141,6 +234,9 @@ export class WorldGenerator {
 
     // Phase 4: Foliage & Trees spawning
     this.generateFoliageAndTrees(chunk, heights, biomesInChunk);
+
+    // Phase 4.5: Structures Spawning
+    this.generateStructures(chunk, heights, biomesInChunk);
 
     // Phase 5: Initial Sky Light calculations
     this.calculateSkyLight(chunk);
@@ -444,5 +540,190 @@ export class WorldGenerator {
     const humid = (this.noiseBiomeHum2D(wx * 0.001, wz * 0.001) + 1) * 0.5;
     const cont = (this.noiseHeight2D(wx * 0.002, wz * 0.002) + 1) * 0.5;
     return getBiome(temp, humid, cont);
+  }
+
+  /**
+   * Generates structures deterministically centered inside a chunk
+   */
+  private generateStructures(chunk: Chunk, heights: Uint8Array, biomes: BiomeDef[]): void {
+    // Generate structure check seeded by chunk coords
+    const chunkRng = createRNG(`struct_${chunk.x}_${chunk.z}`);
+    const randVal = chunkRng();
+
+    const centerIdx = 8 + 8 * CHUNK_SIZE;
+    const sy = heights[centerIdx];
+    const biome = biomes[centerIdx];
+
+    if (sy < 63 || sy > 160) return;
+
+    if (biome.id === 2) { // Desert -> Desert Temple
+      if (randVal < 0.02) {
+        this.buildDesertTemple(chunk, sy);
+      }
+    } else if (biome.id === 0 || biome.id === 8) { // Plains / Savanna -> Village Hut
+      if (randVal < 0.035) {
+        this.buildVillageHut(chunk, sy);
+      }
+    } else if (biome.id === 1 || biome.id === 6) { // Forest / Mountains -> Pillager Outpost
+      if (randVal < 0.015) {
+        this.buildPillagerOutpost(chunk, sy);
+      }
+    }
+  }
+
+  private buildDesertTemple(chunk: Chunk, sy: number): void {
+    const bx = 3;
+    const bz = 3;
+
+    // Layer 0: 9x9 sandstone base
+    for (let x = bx; x < bx + 9; x++) {
+      for (let z = bz; z < bz + 9; z++) {
+        chunk.setBlock(x, sy, z, 21);
+      }
+    }
+
+    // Layer 1: 7x7
+    for (let x = bx + 1; x < bx + 8; x++) {
+      for (let z = bz + 1; z < bz + 8; z++) {
+        chunk.setBlock(x, sy + 1, z, 21);
+      }
+    }
+
+    // Layer 2: 5x5
+    for (let x = bx + 2; x < bx + 7; x++) {
+      for (let z = bz + 2; z < bz + 7; z++) {
+        chunk.setBlock(x, sy + 2, z, 21);
+      }
+    }
+
+    // Layer 3: 3x3
+    for (let x = bx + 3; x < bx + 6; x++) {
+      for (let z = bz + 3; z < bz + 6; z++) {
+        chunk.setBlock(x, sy + 3, z, 21);
+      }
+    }
+
+    // Layer 4: 1x1 top point
+    chunk.setBlock(bx + 4, sy + 4, bz + 4, 21);
+
+    // Carve inner chamber
+    for (let x = bx + 3; x < bx + 6; x++) {
+      for (let z = bz + 3; z < bz + 6; z++) {
+        for (let y = sy; y <= sy + 2; y++) {
+          chunk.setBlock(x, y, z, 0); // Air
+        }
+      }
+    }
+
+    // Place Chest (ID 31) in the center of the temple floor
+    chunk.setBlock(bx + 4, sy, bz + 4, 31);
+    
+    // Place TNT block (ID 59) directly below the floor
+    chunk.setBlock(bx + 4, sy - 1, bz + 4, 59);
+  }
+
+  private buildVillageHut(chunk: Chunk, sy: number): void {
+    const bx = 5;
+    const bz = 5;
+
+    // Floor planks
+    for (let x = bx; x < bx + 5; x++) {
+      for (let z = bz; z < bz + 5; z++) {
+        chunk.setBlock(x, sy - 1, z, 20);
+      }
+    }
+
+    // Walls
+    for (let y = sy; y < sy + 3; y++) {
+      for (let x = bx; x < bx + 5; x++) {
+        for (let z = bz; z < bz + 5; z++) {
+          const isEdgeX = (x === bx || x === bx + 4);
+          const isEdgeZ = (z === bz || z === bz + 4);
+          
+          if (isEdgeX || isEdgeZ) {
+            const isCorner = isEdgeX && isEdgeZ;
+            chunk.setBlock(x, y, z, isCorner ? 19 : 20); // Cobble corners, plank walls
+          }
+        }
+      }
+    }
+
+    // Glass Windows
+    chunk.setBlock(bx, sy + 1, bz + 2, 8);
+    chunk.setBlock(bx + 4, sy + 1, bz + 2, 8);
+
+    // Doorway opening
+    chunk.setBlock(bx + 2, sy, bz, 0);
+    chunk.setBlock(bx + 2, sy + 1, bz, 0);
+    
+    // Roof Planks
+    for (let x = bx; x < bx + 5; x++) {
+      for (let z = bz; z < bz + 5; z++) {
+        chunk.setBlock(x, sy + 3, z, 20);
+      }
+    }
+
+    // Inside Chest
+    chunk.setBlock(bx + 1, sy, bz + 3, 31);
+  }
+
+  private buildPillagerOutpost(chunk: Chunk, sy: number): void {
+    const bx = 5;
+    const bz = 5;
+
+    // Floor Cobble
+    for (let x = bx; x < bx + 6; x++) {
+      for (let z = bz; z < bz + 6; z++) {
+        chunk.setBlock(x, sy - 1, z, 19);
+      }
+    }
+
+    // Walls (5 high)
+    for (let y = sy; y < sy + 5; y++) {
+      for (let x = bx; x < bx + 6; x++) {
+        for (let z = bz; z < bz + 6; z++) {
+          const isEdgeX = (x === bx || x === bx + 5);
+          const isEdgeZ = (z === bz || z === bz + 5);
+          if (isEdgeX || isEdgeZ) {
+            if (y < sy + 2) {
+              chunk.setBlock(x, y, z, 19); // Cobblestone base
+            } else {
+              const isCorner = isEdgeX && isEdgeZ;
+              chunk.setBlock(x, y, z, isCorner ? 6 : 20); // Oak log corners, Plank walls
+            }
+          }
+        }
+      }
+    }
+
+    // Hollow inside
+    for (let y = sy; y < sy + 5; y++) {
+      for (let x = bx + 1; x < bx + 5; x++) {
+        for (let z = bz + 1; z < bz + 5; z++) {
+          chunk.setBlock(x, y, z, 0);
+        }
+      }
+    }
+
+    // Window gaps
+    chunk.setBlock(bx, sy + 3, bz + 3, 0);
+    chunk.setBlock(bx + 5, sy + 3, bz + 3, 0);
+    chunk.setBlock(bx + 3, sy + 3, bz, 0);
+    chunk.setBlock(bx + 3, sy + 3, bz + 5, 0);
+
+    // Ladder climbing
+    for (let y = sy; y < sy + 5; y++) {
+      chunk.setBlock(bx + 1, y, bz + 2, 62);
+    }
+
+    // Roof Planks
+    for (let x = bx; x < bx + 6; x++) {
+      for (let z = bz; z < bz + 6; z++) {
+        chunk.setBlock(x, sy + 5, z, 20);
+      }
+    }
+
+    // Inside Chest
+    chunk.setBlock(bx + 4, sy + 1, bz + 4, 31);
   }
 }

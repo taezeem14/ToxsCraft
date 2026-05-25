@@ -38,43 +38,72 @@
   display: none !important;
 }
 
-.joystick-left {
-  width: 120px;
-  height: 120px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  position: relative;
+.dpad-left {
+  display: grid;
+  grid-template-columns: repeat(3, min(36px, 8vw));
+  grid-template-rows: repeat(3, min(36px, 8vw));
+  gap: 2px;
   pointer-events: auto;
   touch-action: none;
 }
 
-.joystick-knob {
-  width: 50px;
-  height: 50px;
-  background: rgba(255, 255, 255, 0.5);
+.dpad-btn {
+  background: rgba(0, 0, 0, 0.55);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  touch-action: none;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+}
+
+.dpad-btn:active {
+  background: rgba(255, 255, 255, 0.35);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.dpad-up {
+  grid-column: 2;
+  grid-row: 1;
+}
+.dpad-left-arrow {
+  grid-column: 1;
+  grid-row: 2;
+}
+.dpad-center {
+  grid-column: 2;
+  grid-row: 2;
   border-radius: 50%;
-  position: absolute;
-  top: 35px;
-  left: 35px;
-  pointer-events: none;
+  font-size: 10px;
+}
+.dpad-right-arrow {
+  grid-column: 3;
+  grid-row: 2;
+}
+.dpad-down {
+  grid-column: 2;
+  grid-row: 3;
 }
 
 .mobile-buttons-right {
   display: grid;
-  grid-template-columns: repeat(4, min(48px, 11vw)); /* 4 columns to avoid row overflow */
-  gap: 8px;
+  grid-template-columns: repeat(4, min(40px, 9vw));
+  gap: 6px;
   pointer-events: auto;
 }
 
 .mobile-btn {
-  width: min(48px, 11vw);
-  height: min(48px, 11vw);
-  background: rgba(0, 0, 0, 0.4);
-  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  width: min(40px, 9vw);
+  height: min(40px, 9vw);
+  background: rgba(0, 0, 0, 0.55);
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
   border-radius: 6px;
   color: white;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 8px;
   font-weight: bold;
   text-align: center;
   touch-action: none;
@@ -895,7 +924,7 @@ body, html {
 /* Responsive / Mobile scaling media queries */
 @media (max-width: 768px), (max-height: 500px) {
   .game-logo {
-    font-size: 2.2rem !important;
+    font-size: min(2.2rem, 8vw) !important;
     margin-bottom: 4px !important;
   }
   
@@ -938,4 +967,36 @@ body, html {
     padding-bottom: 65px !important; /* Slightly less padding-bottom since hotbar is shorter */
   }
 }
+
+/* Creative Items Catalog Overlay styling */
+.inventory-creative-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1.2;
+  min-width: 260px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.creative-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 40px);
+  grid-auto-rows: 40px;
+  gap: 6px;
+  max-height: 230px;
+  overflow-y: auto;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.creative-grid::-webkit-scrollbar {
+  width: 6px;
+}
+.creative-grid::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
 

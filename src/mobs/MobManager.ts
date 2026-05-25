@@ -8,12 +8,13 @@ import { MobEntity, MobType } from './MobEntity';
 import { ArrowEntity } from './ArrowEntity';
 import { Player } from '../player/Player';
 import { ChunkManager } from '../world/ChunkManager';
+import { settingsManager } from '../core/SettingsManager';
 
 export class MobManager {
   private scene: THREE.Scene;
   private mobs: MobEntity[] = [];
   private arrows: ArrowEntity[] = [];
-  private spawnCooldown = 12.0; // spawn check every 12 seconds
+  private spawnCooldown = 5.0; // spawn check every 5 seconds
   private spawnTimer = 0;
   private maxMobs = 18; // Support slightly more mobs for splitting slimes
 
@@ -58,12 +59,18 @@ export class MobManager {
   }
 
   private attemptSpawn(player: Player, chunkManager: ChunkManager): void {
-    // Pick random horizontal offset from player (30-55 blocks away)
+    // Pick spawn distance within loaded render boundaries
+    const renderDist = settingsManager.getValue('renderDistance') || 4;
+    const maxDist = Math.max(20.0, Math.min(50.0, renderDist * 16 - 8));
+    const minDist = 12.0;
+    const dist = minDist + Math.random() * (maxDist - minDist);
+
     const angle = Math.random() * Math.PI * 2;
-    const dist = 30.0 + Math.random() * 25.0;
-    
     const sx = Math.floor(player.position.x + Math.cos(angle) * dist);
     const sz = Math.floor(player.position.z + Math.sin(angle) * dist);
+
+    const { cx, cz } = chunkManager.getChunkCoords(sx, sz);
+    if (!chunkManager.isChunkLoaded(cx, cz)) return;
 
     // Find surface Y level
     let sy = -1;
@@ -77,7 +84,15 @@ export class MobManager {
 
     if (sy > 0) {
       const id = Math.random().toString(36).substring(2, 9);
+      const biome = chunkManager.getBiomeAt(sx, sz);
       const types: MobType[] = ['cow', 'pig', 'zombie', 'creeper', 'skeleton', 'spider', 'slime', 'chicken'];
+      
+      if (biome.id === 0 || biome.id === 8) { // Plains / Savanna
+        types.push('villager');
+      } else if (biome.id === 1 || biome.id === 6) { // Forest / Mountains
+        types.push('pillager');
+      }
+      
       const chosenType = types[Math.floor(Math.random() * types.length)];
       
       const spawnPos = new THREE.Vector3(sx, sy, sz);

@@ -98,7 +98,8 @@ export const BLOCKS: { [id: number]: BlockDef } = {
   68: { id: 68, name: "Brown Mushroom Block", solid: true, transparent: false, emissive: 0, hardness: 0.2, lootItem: "brown_mushroom", textures: { top: 75, bottom: 77, side: 75 } },
   69: { id: 69, name: "Mushroom Stem", solid: true, transparent: false, emissive: 0, hardness: 0.2, lootItem: "mushroom_stem", textures: { top: 76, bottom: 76, side: 76 } },
   70: { id: 70, name: "Acacia Log", solid: true, transparent: false, emissive: 0, hardness: 2.0, lootItem: "acacia_log", textures: { top: 78, bottom: 78, side: 79 } },
-  71: { id: 71, name: "Acacia Leaves", solid: true, transparent: true, emissive: 0, hardness: 0.2, lootItem: "acacia_sapling", textures: { top: 80, bottom: 80, side: 80 } }
+  71: { id: 71, name: "Acacia Leaves", solid: true, transparent: true, emissive: 0, hardness: 0.2, lootItem: "acacia_sapling", textures: { top: 80, bottom: 80, side: 80 } },
+  72: { id: 72, name: "Nether Portal", solid: false, transparent: true, emissive: 11, hardness: 0.2, textures: { top: 81, bottom: 81, side: 81 } }
 };
 
 export function getBlock(id: number): BlockDef {

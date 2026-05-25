@@ -77,6 +77,7 @@ export class Game {
 
   // Active Save World State
   public activeWorld: WorldMetadata | null = null;
+  private portalTimer = 0;
   private autoSaveTimer = 0;
   private totalPlaytime = 0;
 
@@ -90,6 +91,7 @@ export class Game {
   private selectionBox!: THREE.LineSegments;
   private miningProgress = 0;
   private miningTarget: { x: number; y: number; z: number } | null = null;
+  private meshQueue: any[] = [];
 
   // FPS calculation
   private fpsFrameCount = 0;
@@ -168,6 +170,8 @@ export class Game {
     this.activeWorld = world;
     this.totalPlaytime = world.playtime;
     this.dayNightCycle = new DayNightCycle();
+    this.player.isCreative = (world.gameMode === 'creative');
+    this.meshQueue = [];
 
     eventBus.emit('loading_progress', 'Connecting database...', 10);
     await WorldDatabase.init();
@@ -178,6 +182,7 @@ export class Game {
     // Try loading player save profile
     const savedPlayer = await WorldDatabase.loadPlayer(world.id);
     if (savedPlayer) {
+      this.chunkManager.currentDimension = savedPlayer.dimension || 'overworld';
       this.player.position.set(savedPlayer.position.x, savedPlayer.position.y, savedPlayer.position.z);
       this.player.health = savedPlayer.health;
       this.player.hunger = savedPlayer.hunger;
@@ -233,7 +238,7 @@ export class Game {
       this.player.position.set(spawnX + 0.5, spawnY + 2.0, spawnZ + 0.5);
       
       // Default standard starting inventory
-      this.giveStarterKit();
+      this.giveStarterKit(spawnX, spawnY, spawnZ);
     }
 
     this.movementController = new MovementController(this.player, this.inputManager, this.chunkManager);
@@ -275,6 +280,8 @@ export class Game {
     this.isRunning = true;
     this.lastTime = performance.now();
     
+    eventBus.emit('player_status_change');
+    eventBus.emit('player_xp_change');
     eventBus.emit('loading_complete');
     this.inputManager.requestLock();
   }
@@ -297,7 +304,7 @@ export class Game {
     for (const chunk of chunks) {
       if (chunk.isDirty || true) { // save all loadable blocks
         const data = chunk.serialize();
-        await WorldDatabase.saveChunk(this.activeWorld.id, chunk.x, chunk.z, data);
+        await WorldDatabase.saveChunk(this.activeWorld.id, chunk.x, chunk.z, data, this.chunkManager.currentDimension);
         chunk.isDirty = false;
       }
     }
@@ -312,7 +319,8 @@ export class Game {
       daysElapsed: this.dayNightCycle.getDaysElapsed(),
       timeOfDay: this.dayNightCycle.getTime(),
       level: this.player.level,
-      xp: this.player.xp
+      xp: this.player.xp,
+      dimension: this.chunkManager.currentDimension
     });
 
     eventBus.emit('saving_complete');
@@ -329,8 +337,219 @@ export class Game {
     }
   }
 
-  private giveStarterKit(): void {
-    // Basic setup if wanted, currently we just leave UI empty
+  private giveStarterKit(spawnX: number, spawnY: number, spawnZ: number): void {
+    // Clear initial scaffolded slots first for a clean spawn kit
+    this.player.inventory.clear();
+
+    // Give starter items
+    this.player.inventory.setItem(0, createItemStack('stone_pickaxe', 1));
+    this.player.inventory.setItem(1, createItemStack('stone_sword', 1));
+    this.player.inventory.setItem(2, createItemStack('flint_and_steel', 1));
+    this.player.inventory.setItem(3, createItemStack('torch', 64));
+    this.player.inventory.setItem(4, createItemStack('apple', 16));
+    this.player.inventory.setItem(5, createItemStack('bread', 16));
+
+    // Place bonus chest at (spawnX + 2, spawnZ + 2) surface height
+    let cy = 255;
+    while (cy > 0) {
+      const b = this.chunkManager.getBlock(spawnX + 2, cy, spawnZ + 2);
+      if (b !== 0 && b !== 8 && b !== 9) {
+        break;
+      }
+      cy--;
+    }
+    if (cy <= 0) cy = spawnY;
+    
+    // Set chest and torch blocks
+    this.chunkManager.setBlock(spawnX + 2, cy + 1, spawnZ + 2, 31); // Chest
+    this.chunkManager.setBlock(spawnX + 2, cy + 2, spawnZ + 2, 27); // Torch on top
+  }
+
+  public async switchDimension(): Promise<void> {
+    if (!this.activeWorld) return;
+
+    eventBus.emit('show_toast', "Entering portal, switching dimensions...");
+    
+    // 1. Save current world and coordinates
+    await this.saveWorld();
+
+    // 2. Clear current visual meshes, chunk cache, and mobs
+    this.renderer.clearAllMeshes();
+    this.chunkManager.clear();
+    if (this.mobManager) this.mobManager.clear();
+    this.meshQueue = [];
+
+    // 3. Teleport & Scale coords (1:8 ratio)
+    const currentDim = this.chunkManager.currentDimension;
+    const targetDim = currentDim === 'overworld' ? 'nether' : 'overworld';
+    this.chunkManager.currentDimension = targetDim;
+
+    const scale = targetDim === 'nether' ? 0.125 : 8.0;
+    let tx = this.player.position.x * scale;
+    let tz = this.player.position.z * scale;
+    let ty = 64; // Default starting height search
+
+    // 4. Pre-load chunks around destination coords
+    const playerChunkX = Math.floor(tx / 16);
+    const playerChunkZ = Math.floor(tz / 16);
+    const worldId = this.activeWorld.id;
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dz = -2; dz <= 2; dz++) {
+        await this.chunkManager.forceLoadChunk(playerChunkX + dx, playerChunkZ + dz, worldId);
+      }
+    }
+
+    // 5. Scan column to find a safe air pocket with solid floor
+    let foundSafe = false;
+    for (let dy = 10; dy < 110; dy++) {
+      const footB = this.chunkManager.getBlock(Math.floor(tx), dy, Math.floor(tz));
+      const headB = this.chunkManager.getBlock(Math.floor(tx), dy + 1, Math.floor(tz));
+      const standB = this.chunkManager.getBlock(Math.floor(tx), dy - 1, Math.floor(tz));
+      if (footB === 0 && headB === 0 && standB !== 0 && standB !== 10 && standB !== 9) {
+        ty = dy;
+        foundSafe = true;
+        break;
+      }
+    }
+
+    if (!foundSafe) {
+      // Area scan for a safe spot within a 5-block radius
+      let scanFound = false;
+      for (let ox = -5; ox <= 5 && !scanFound; ox++) {
+        for (let oz = -5; oz <= 5 && !scanFound; oz++) {
+          for (let dy = 10; dy < 110; dy++) {
+            const footB = this.chunkManager.getBlock(Math.floor(tx) + ox, dy, Math.floor(tz) + oz);
+            const headB = this.chunkManager.getBlock(Math.floor(tx) + ox, dy + 1, Math.floor(tz) + oz);
+            const standB = this.chunkManager.getBlock(Math.floor(tx) + ox, dy - 1, Math.floor(tz) + oz);
+            if (footB === 0 && headB === 0 && standB !== 0 && standB !== 10 && standB !== 9) {
+              tx = tx + ox;
+              tz = tz + oz;
+              ty = dy;
+              scanFound = true;
+              break;
+            }
+          }
+        }
+      }
+      // Platform builder if spawn is fully floating or inside solid ground
+      if (!scanFound) {
+        ty = 64;
+        const platformBlock = targetDim === 'nether' ? 53 : 1; // Netherrack or Stone
+        for (let ox = -1; ox <= 1; ox++) {
+          for (let oz = -1; oz <= 1; oz++) {
+            this.chunkManager.setBlock(Math.floor(tx) + ox, ty - 1, Math.floor(tz) + oz, platformBlock);
+            this.chunkManager.setBlock(Math.floor(tx) + ox, ty, Math.floor(tz) + oz, 0);
+            this.chunkManager.setBlock(Math.floor(tx) + ox, ty + 1, Math.floor(tz) + oz, 0);
+          }
+        }
+      }
+    }
+
+    // 6. Build a return portal frame at the destination
+    const basePX = Math.floor(tx);
+    const basePZ = Math.floor(tz);
+    // Build vertical Obsidian frame along X-axis
+    for (let x = basePX - 1; x <= basePX + 2; x++) {
+      this.chunkManager.setBlock(x, ty - 1, basePZ, 26); // bottom
+      this.chunkManager.setBlock(x, ty + 3, basePZ, 26); // top
+    }
+    for (let y = ty; y <= ty + 2; y++) {
+      this.chunkManager.setBlock(basePX - 1, y, basePZ, 26); // left
+      this.chunkManager.setBlock(basePX + 2, y, basePZ, 26); // right
+    }
+    // Fill inner portal blocks (72)
+    for (let x = basePX; x <= basePX + 1; x++) {
+      for (let y = ty; y <= ty + 2; y++) {
+        this.chunkManager.setBlock(x, y, basePZ, 72);
+      }
+    }
+
+    // 7. Place player standing directly in front of the return portal
+    this.player.position.set(basePX + 0.5, ty + 0.1, basePZ + 1.5);
+    this.player.velocity.set(0, 0, 0);
+    this.player.onGround = true;
+
+    // 8. Remesh all active chunks immediately
+    const activeChunks = this.chunkManager.getActiveChunks();
+    for (const chunk of activeChunks) {
+      const meshData = GreedyMesher.generateGeometry(chunk, this.chunkManager);
+      this.renderer.updateChunkMesh(chunk.x, chunk.z, meshData.solid, meshData.transparent);
+    }
+
+    eventBus.emit('show_toast', targetDim === 'nether' ? "Entered the Nether" : "Returned to the Overworld");
+    eventBus.emit('player_status_change');
+  }
+
+  public tryCreatePortal(tx: number, ty: number, tz: number): boolean {
+    const targetBlock = this.chunkManager.getBlock(tx, ty, tz);
+    if (targetBlock !== 0 && targetBlock !== 27) return false;
+
+    // Verify frames in X-Y or Z-Y alignments
+    const axes: ('x' | 'z')[] = ['x', 'z'];
+    for (const axis of axes) {
+      for (let ix = 0; ix < 2; ix++) {
+        for (let iy = 0; iy < 3; iy++) {
+          const x0 = axis === 'x' ? tx - ix : tx;
+          const y0 = ty - iy;
+          const z0 = axis === 'z' ? tz - ix : tz;
+
+          if (this.checkPortalFrame(x0, y0, z0, axis)) {
+            // Valid frame found, fill inner 2x3 area with portal blocks (72)
+            for (let h = 0; h < 2; h++) {
+              for (let v = 0; v < 3; v++) {
+                const px = axis === 'x' ? x0 + h : x0;
+                const py = y0 + v;
+                const pz = axis === 'z' ? z0 + h : z0;
+                this.chunkManager.setBlock(px, py, pz, 72);
+              }
+            }
+            AssetLoader.playSound('place', 72);
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  private checkPortalFrame(x0: number, y0: number, z0: number, axis: 'x' | 'z'): boolean {
+    const isObsidian = (bx: number, by: number, bz: number) => {
+      return this.chunkManager.getBlock(bx, by, bz) === 26;
+    };
+
+    const frameOffsets = [
+      { h: 0, v: -1 }, { h: 1, v: -1 }, // bottom
+      { h: 0, v: 3 }, { h: 1, v: 3 },   // top
+      { h: -1, v: 0 }, { h: -1, v: 1 }, { h: -1, v: 2 }, // left
+      { h: 2, v: 0 }, { h: 2, v: 1 }, { h: 2, v: 2 }   // right
+    ];
+
+    for (const offset of frameOffsets) {
+      const bx = axis === 'x' ? x0 + offset.h : x0;
+      const by = y0 + offset.v;
+      const bz = axis === 'z' ? z0 + offset.h : z0;
+      if (!isObsidian(bx, by, bz)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  public clearPortal(x: number, y: number, z: number): void {
+    const directions = [
+      { x: 1, y: 0, z: 0 }, { x: -1, y: 0, z: 0 },
+      { x: 0, y: 1, z: 0 }, { x: 0, y: -1, z: 0 },
+      { x: 0, y: 0, z: 1 }, { x: 0, y: 0, z: -1 }
+    ];
+    for (const dir of directions) {
+      const nx = x + dir.x;
+      const ny = y + dir.y;
+      const nz = z + dir.z;
+      if (this.chunkManager.getBlock(nx, ny, nz) === 72) {
+        this.chunkManager.setBlock(nx, ny, nz, 0); // clear portal block
+        this.clearPortal(nx, ny, nz); // recursive flood clear
+      }
+    }
   }
 
   /**
@@ -381,14 +600,42 @@ export class Game {
       this.player.update(deltaSec);
       this.mobManager.update(deltaSec, this.player, this.chunkManager);
 
+      // Portal Collision Check
+      const px = Math.floor(this.player.position.x);
+      const py = Math.floor(this.player.position.y);
+      const pz = Math.floor(this.player.position.z);
+      const footBlock = this.chunkManager.getBlock(px, py, pz);
+      const headBlock = this.chunkManager.getBlock(px, py + 1, pz);
+      if (footBlock === 72 || headBlock === 72) {
+        this.portalTimer += deltaSec;
+        if (Math.floor(this.portalTimer * 10) % 5 === 0) {
+          eventBus.emit('show_toast', `Warping... ${(1.5 - this.portalTimer).toFixed(1)}s`);
+        }
+        if (this.portalTimer >= 1.5) {
+          this.portalTimer = 0;
+          this.switchDimension();
+        }
+      } else {
+        this.portalTimer = 0;
+      }
+
       // Async Chunk Loading update around player
       const updates = this.chunkManager.update(this.player.position.x, this.player.position.z);
       
-      // Load new meshes
-      for (const chunk of updates.loaded) {
-        const meshData = GreedyMesher.generateGeometry(chunk, this.chunkManager);
-        this.renderer.updateChunkMesh(chunk.x, chunk.z, meshData.solid, meshData.transparent);
+      // Load new meshes (queue them to optimize framerate and eliminate sprinting lag)
+      if (updates.loaded && updates.loaded.length > 0) {
+        this.meshQueue.push(...updates.loaded);
       }
+
+      // Process 1 queued chunk mesh per frame to ensure smooth gameplay
+      if (this.meshQueue.length > 0) {
+        const chunk = this.meshQueue.shift()!;
+        if (this.chunkManager.isChunkLoaded(chunk.x, chunk.z)) {
+          const meshData = GreedyMesher.generateGeometry(chunk, this.chunkManager);
+          this.renderer.updateChunkMesh(chunk.x, chunk.z, meshData.solid, meshData.transparent);
+        }
+      }
+
       // Unload far meshes
       for (const key of updates.unloaded || []) {
         const parts = key.split(',');
@@ -430,12 +677,17 @@ export class Game {
     const lookTarget = new THREE.Vector3(
       Math.sin(this.player.yaw) * Math.cos(this.player.pitch),
       Math.sin(this.player.pitch),
-      Math.cos(this.player.yaw) * Math.cos(this.player.pitch)
+      -Math.cos(this.player.yaw) * Math.cos(this.player.pitch)
     );
     this.renderer.camera.lookAt(this.player.position.clone().setY(eyeY).add(lookTarget));
 
     // Render frame
-    this.renderer.render(this.dayNightCycle.getTime(), this.player.position, now);
+    this.renderer.render(
+      this.dayNightCycle.getTime(),
+      this.player.position,
+      now,
+      this.chunkManager.currentDimension === 'nether'
+    );
   }
 
   private updateRaycasting(): void {
@@ -522,8 +774,14 @@ export class Game {
 
     if (this.miningProgress >= totalDuration) {
       // Mine success! Break block
+      const oldBlockId = this.chunkManager.getBlock(this.miningTarget.x, this.miningTarget.y, this.miningTarget.z);
       this.chunkManager.setBlock(this.miningTarget.x, this.miningTarget.y, this.miningTarget.z, 0); // set to Air
       AssetLoader.playSound('dig', block.id);
+
+      // If we broke Obsidian or a Portal block, clear adjacent portals
+      if (oldBlockId === 26 || oldBlockId === 72) {
+        this.clearPortal(this.miningTarget.x, this.miningTarget.y, this.miningTarget.z);
+      }
 
       // Loot item drop drop simulation
       const itemToDrop = block.lootItem || block.name.toLowerCase().replace(' ', '_');
@@ -557,11 +815,16 @@ export class Game {
     // Resolve block ID to place
     const blockIdToPlace = BLOCK_PLACEMENT_MAP[heldStack.id];
     if (blockIdToPlace === undefined) {
-      // Not a placeable block item, check if food
+      // Not a placeable block item, check if food or flint and steel
       if (heldStack.id === 'apple') {
         this.player.eat(4); // eat apple
         this.player.inventory.consumeSelected();
         AssetLoader.playSound('place'); // eat crunch sound bypass
+      } else if (heldStack.id === 'flint_and_steel') {
+        const px = this.hitResult.blockX + this.hitResult.faceNormal.x;
+        const py = this.hitResult.blockY + this.hitResult.faceNormal.y;
+        const pz = this.hitResult.blockZ + this.hitResult.faceNormal.z;
+        this.tryCreatePortal(px, py, pz);
       }
       return; 
     }
@@ -582,7 +845,11 @@ export class Game {
     }
 
     // Place block
+    const oldBlockAtPlace = this.chunkManager.getBlock(px, py, pz);
     this.chunkManager.setBlock(px, py, pz, blockIdToPlace);
+    if (oldBlockAtPlace === 72) {
+      this.clearPortal(px, py, pz);
+    }
     this.player.inventory.consumeSelected();
     AssetLoader.playSound('place', blockIdToPlace);
   }

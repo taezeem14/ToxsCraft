@@ -12,8 +12,7 @@ export class InputManager {
   private isPointerLocked = false;
   private isMobile = false;
   private targetElement: HTMLElement;
-  private joystickActive = false;
-  private joystickOrigin = { x: 0, y: 0 };
+  // Joystick fields removed in favor of D-pad
 
   // Virtual keys for mobile
   private virtualKeys: Map<string, boolean> = new Map();
@@ -42,32 +41,29 @@ export class InputManager {
       if (!state && wasDown) eventBus.emit('keyup', code);
     };
 
-    // Joystick logic
-    const joystick = document.getElementById('joystick-move');
-    const knob = document.getElementById('joystick-move-knob');
-    if (joystick && knob) {
-      joystick.addEventListener('touchstart', (e) => {
+    // D-Pad Bindings
+    const bindDpad = (id: string, code: string) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        this.joystickActive = true;
-        const rect = joystick.getBoundingClientRect();
-        this.joystickOrigin = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-        this.updateJoystick(e.touches[0], knob);
-      }, { passive: false });
+        setVirtualKey(code, true);
+      });
+      btn.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        setVirtualKey(code, false);
+      });
+      btn.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        setVirtualKey(code, false);
+      });
+    };
 
-      joystick.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        if (this.joystickActive) this.updateJoystick(e.touches[0], knob);
-      }, { passive: false });
-
-      const stopJoystick = (e: TouchEvent) => {
-        e.preventDefault();
-        this.joystickActive = false;
-        knob.style.transform = `translate(0px, 0px)`;
-        ['KeyW', 'KeyS', 'KeyA', 'KeyD'].forEach(k => setVirtualKey(k, false));
-      };
-      joystick.addEventListener('touchend', stopJoystick, { passive: false });
-      joystick.addEventListener('touchcancel', stopJoystick, { passive: false });
-    }
+    bindDpad('btn-dpad-up', 'KeyW');
+    bindDpad('btn-dpad-down', 'KeyS');
+    bindDpad('btn-dpad-left', 'KeyA');
+    bindDpad('btn-dpad-right', 'KeyD');
+    bindDpad('btn-dpad-center', 'ShiftLeft');
 
     // Touch look tracking
     document.addEventListener('touchstart', (e) => {
@@ -169,31 +165,6 @@ export class InputManager {
     }
   }
 
-  private updateJoystick(touch: Touch, knob: HTMLElement) {
-    const dx = touch.clientX - this.joystickOrigin.x;
-    const dy = touch.clientY - this.joystickOrigin.y;
-    const distance = Math.min(35, Math.sqrt(dx * dx + dy * dy));
-    const angle = Math.atan2(dy, dx);
-
-    const nx = Math.cos(angle) * distance;
-    const ny = Math.sin(angle) * distance;
-
-    knob.style.transform = `translate(${nx}px, ${ny}px)`;
-
-    // Convert to WASD
-    const threshold = 15;
-    const setVirtualKey = (code: string, state: boolean) => {
-      const wasDown = this.virtualKeys.get(code) || false;
-      this.virtualKeys.set(code, state);
-      if (state && !wasDown) eventBus.emit('keydown', code);
-      if (!state && wasDown) eventBus.emit('keyup', code);
-    };
-
-    setVirtualKey('KeyW', ny < -threshold);
-    setVirtualKey('KeyS', ny > threshold);
-    setVirtualKey('KeyA', nx < -threshold);
-    setVirtualKey('KeyD', nx > threshold);
-  }
 
   private initListeners(): void {
     // Keyboard listeners

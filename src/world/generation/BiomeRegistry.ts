@@ -172,6 +172,20 @@ export const BIOMES: { [id: number]: BiomeDef } = {
     treeType: 'oak',
     detailChance: 0.2,
     fogColor: [0.8, 0.85, 0.9]
+  },
+  11: { // Nether
+    id: 11,
+    name: "Nether",
+    temperature: 1.0,
+    humidity: 0.0,
+    baseHeight: 0.3,
+    variation: 0.1,
+    surfaceBlock: 53, // Netherrack
+    subSurfaceBlock: 53, // Netherrack
+    treeChance: 0.0,
+    treeType: 'oak',
+    detailChance: 0.0,
+    fogColor: [0.3, 0.05, 0.05]
   }
 };
 

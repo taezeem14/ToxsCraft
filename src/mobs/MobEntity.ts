@@ -9,7 +9,7 @@ import { ChunkManager } from '../world/ChunkManager';
 import { Player } from '../player/Player';
 import { AssetLoader } from '../core/AssetLoader';
 
-export type MobType = 'cow' | 'pig' | 'zombie' | 'creeper' | 'skeleton' | 'spider' | 'slime' | 'chicken';
+export type MobType = 'cow' | 'pig' | 'zombie' | 'creeper' | 'skeleton' | 'spider' | 'slime' | 'chicken' | 'villager' | 'pillager';
 export type MobState = 'idle' | 'wander' | 'chase' | 'flee';
 
 export class MobEntity implements PhysicsEntity {
@@ -59,7 +59,7 @@ export class MobEntity implements PhysicsEntity {
     this.position.copy(spawnPos);
 
     // Hostile designations
-    this.isHostile = (type === 'zombie' || type === 'creeper' || type === 'skeleton' || type === 'spider' || type === 'slime');
+    this.isHostile = (type === 'zombie' || type === 'creeper' || type === 'skeleton' || type === 'spider' || type === 'slime' || type === 'pillager');
 
     // Customize physical attributes based on type
     if (this.type === 'chicken') {
@@ -103,6 +103,16 @@ export class MobEntity implements PhysicsEntity {
       this.height = 0.85;
       this.health = 10.0;
       this.maxHealth = 10.0;
+    } else if (this.type === 'villager') {
+      this.radius = 0.35;
+      this.height = 1.95;
+      this.health = 20.0;
+      this.maxHealth = 20.0;
+    } else if (this.type === 'pillager') {
+      this.radius = 0.35;
+      this.height = 1.95;
+      this.health = 24.0;
+      this.maxHealth = 24.0;
     }
 
     this.mesh = this.buildMesh();
@@ -223,6 +233,23 @@ export class MobEntity implements PhysicsEntity {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(3, 6, 1, 2);
       ctx.fillRect(12, 6, 1, 2);
+    } else if (type === 'villager') {
+      this.applyNoise(ctx, '#bd8c72', 10);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(2, 6, 2, 2);
+      ctx.fillRect(12, 6, 2, 2);
+      ctx.fillStyle = '#006400'; // Green eyes
+      ctx.fillRect(3, 6, 1, 2);
+      ctx.fillRect(12, 6, 1, 2);
+      ctx.fillStyle = '#a67258'; // Large nose
+      ctx.fillRect(6, 7, 4, 5);
+    } else if (type === 'pillager') {
+      this.applyNoise(ctx, '#90a4ae', 10);
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(2, 7, 2, 2);
+      ctx.fillRect(12, 7, 2, 2);
+      ctx.fillStyle = '#37474f'; // Nose
+      ctx.fillRect(6, 8, 4, 4);
     }
   }
 
@@ -280,6 +307,26 @@ export class MobEntity implements PhysicsEntity {
         this.applyNoise(ctx, '#ff9800', 10);
       } else {
         this.applyNoise(ctx, '#ffffff', 8);
+      }
+    } else if (type === 'villager') {
+      if (part === 'body') {
+        this.applyNoise(ctx, '#5c4033', 10); // Brown robe
+      } else if (part === 'head') {
+        this.applyNoise(ctx, '#bd8c72', 10); // Skin color
+      } else {
+        this.applyNoise(ctx, '#5c4033', 8); // robe sleeves/pants
+      }
+    } else if (type === 'pillager') {
+      if (part === 'body') {
+        this.applyNoise(ctx, '#37474f', 12); // Grey combat tunic
+      } else if (part === 'head') {
+        this.applyNoise(ctx, '#90a4ae', 10);
+      } else {
+        ctx.fillStyle = '#37474f';
+        ctx.fillRect(0, 0, 16, 4); // sleeve/cuff
+        ctx.fillStyle = '#90a4ae';
+        ctx.fillRect(0, 4, 16, 12); // grey skin arms/legs
+        this.applyNoise(ctx, '#90a4ae', 10);
       }
     }
   }
@@ -385,8 +432,8 @@ export class MobEntity implements PhysicsEntity {
 
     const type = this.type;
 
-    if (type === 'zombie' || type === 'skeleton') {
-      // Humanoids (Zombie, Skeleton)
+    if (type === 'zombie' || type === 'skeleton' || type === 'villager' || type === 'pillager') {
+      // Humanoids (Zombie, Skeleton, Villager, Pillager)
       const isSkel = type === 'skeleton';
       
       // Head
@@ -408,14 +455,14 @@ export class MobEntity implements PhysicsEntity {
       const armMat = MobEntity.getMobMaterial(type, 'limb');
       
       this.leftArmMesh = new THREE.Mesh(armGeom, armMat);
-      this.leftArmMesh.position.set(isSkel ? -0.21 : -0.26, 0.9, 0.2);
-      this.leftArmMesh.rotation.x = -Math.PI / 2; // arms point forward
+      this.leftArmMesh.position.set(isSkel ? -0.21 : -0.26, 0.9, (type === 'zombie' || type === 'skeleton') ? 0.2 : 0);
+      this.leftArmMesh.rotation.x = (type === 'zombie' || type === 'skeleton') ? -Math.PI / 2 : 0;
       group.add(this.leftArmMesh);
 
       // Right Arm
       this.rightArmMesh = new THREE.Mesh(armGeom, armMat);
-      this.rightArmMesh.position.set(isSkel ? 0.21 : 0.26, 0.9, 0.2);
-      this.rightArmMesh.rotation.x = -Math.PI / 2; // arms point forward
+      this.rightArmMesh.position.set(isSkel ? 0.21 : 0.26, 0.9, (type === 'zombie' || type === 'skeleton') ? 0.2 : 0);
+      this.rightArmMesh.rotation.x = (type === 'zombie' || type === 'skeleton') ? -Math.PI / 2 : 0;
       group.add(this.rightArmMesh);
 
       // Left Leg
@@ -831,8 +878,8 @@ export class MobEntity implements PhysicsEntity {
       }
     }
 
-    // Skeleton shooting arrow logic
-    if (this.type === 'skeleton') {
+    // Skeleton / Pillager shooting arrow logic
+    if (this.type === 'skeleton' || this.type === 'pillager') {
       if (this.state === 'chase' && distToPlayer < 16.0 && !player.isDead && !player.isFlying) {
         this.skeletonShootCooldown = (this.skeletonShootCooldown || 0) - deltaSec;
         if (this.skeletonShootCooldown <= 0) {
@@ -864,7 +911,7 @@ export class MobEntity implements PhysicsEntity {
         this.leftLegMesh.rotation.x = swing * 0.5;
         this.rightLegMesh.rotation.x = -swing * 0.5;
       }
-      if (this.leftArmMesh && this.rightArmMesh && this.type !== 'zombie') {
+      if (this.leftArmMesh && this.rightArmMesh && this.type !== 'zombie' && this.type !== 'skeleton') {
         this.leftArmMesh.rotation.x = -swing * 0.5;
         this.rightArmMesh.rotation.x = swing * 0.5;
       }
@@ -888,7 +935,7 @@ export class MobEntity implements PhysicsEntity {
         this.leftLegMesh.rotation.x = 0;
         this.rightLegMesh.rotation.x = 0;
       }
-      if (this.leftArmMesh && this.rightArmMesh && this.type !== 'zombie') {
+      if (this.leftArmMesh && this.rightArmMesh && this.type !== 'zombie' && this.type !== 'skeleton') {
         this.leftArmMesh.rotation.x = 0;
         this.rightArmMesh.rotation.x = 0;
       }

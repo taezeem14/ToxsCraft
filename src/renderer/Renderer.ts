@@ -115,6 +115,7 @@ export class Renderer {
       vertexColors: true,
       depthWrite: true,
       transparent: false,
+      side: THREE.DoubleSide
     });
 
     // 2. Liquid Water material
@@ -124,7 +125,8 @@ export class Renderer {
       uniforms: commonUniforms,
       transparent: true,
       depthWrite: false, // Prevents transparent sorting artifacts
-      vertexColors: false
+      vertexColors: false,
+      side: THREE.DoubleSide
     });
 
     // 3. Liquid Lava material
@@ -132,7 +134,8 @@ export class Renderer {
       vertexShader: lavaVertShader,
       fragmentShader: lavaFragShader,
       uniforms: commonUniforms,
-      vertexColors: false
+      vertexColors: false,
+      side: THREE.DoubleSide
     });
   }
 
@@ -217,20 +220,27 @@ export class Renderer {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   };
 
-  /**
-   * Render loop frame step
-   */
-  public render(timeOfDay: number, playerPos: THREE.Vector3, gameTime: number): void {
-    // 1. Update Sky elements
-    this.skySystem.update(timeOfDay, playerPos);
+  public render(timeOfDay: number, playerPos: THREE.Vector3, gameTime: number, isNether = false): void {
+    let fogColor: THREE.Color;
+    let sunIntensity: number;
 
-    // 2. Adjust fog color matching sky gradient
-    const fogColor = this.skySystem.getFogColor();
-    this.scene.fog = new THREE.FogExp2(fogColor, 0.0035);
+    if (isNether) {
+      this.skySystem.setDimension('nether');
+      fogColor = new THREE.Color(0.12, 0.03, 0.03); // Dark red Nether fog
+      this.scene.fog = new THREE.FogExp2(fogColor, 0.015); // High density cavern fog
+      sunIntensity = 0.45; // Constant base light level
+    } else {
+      this.skySystem.setDimension('overworld');
+      // 1. Update Sky elements
+      this.skySystem.update(timeOfDay, playerPos);
+      fogColor = this.skySystem.getFogColor();
+      this.scene.fog = new THREE.FogExp2(fogColor, 0.0035);
+      sunIntensity = this.skySystem.getSunlightIntensity();
+    }
+
     this.renderer.setClearColor(fogColor);
 
-    // 3. Update uniforms
-    const sunIntensity = this.skySystem.getSunlightIntensity();
+    // Update uniforms
     this.blockMaterial.uniforms.uSunlightIntensity.value = sunIntensity;
     this.blockMaterial.uniforms.uFogColor.value.copy(fogColor);
     
@@ -241,11 +251,13 @@ export class Renderer {
     this.lavaMaterial.uniforms.uFogColor.value.copy(fogColor);
     this.lavaMaterial.uniforms.uTime.value = gameTime * 0.001;
 
-    // Center shadow frustum on player to save draw calls
-    this.dirLight.shadow.camera.position.copy(playerPos).add(new THREE.Vector3(50, 100, 30));
-    this.dirLight.shadow.camera.lookAt(playerPos);
+    if (!isNether) {
+      // Center shadow frustum on player to save draw calls
+      this.dirLight.shadow.camera.position.copy(playerPos).add(new THREE.Vector3(50, 100, 30));
+      this.dirLight.shadow.camera.lookAt(playerPos);
+    }
 
-    // 4. Render main scene pass
+    // Render main scene pass
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -261,12 +273,17 @@ export class Renderer {
     }
   }
 
-  public clear(): void {
-    // Clean all loaded meshes
-    for (const key of this.solidMeshes.keys()) {
+  public clearAllMeshes(): void {
+    const keys = Array.from(this.solidMeshes.keys());
+    for (const key of keys) {
       const parts = key.split(',');
       this.removeChunkMesh(parseInt(parts[0]), parseInt(parts[1]));
     }
+  }
+
+  public clear(): void {
+    // Clean all loaded meshes
+    this.clearAllMeshes();
     window.removeEventListener('resize', this.onWindowResize);
     this.renderer.dispose();
   }

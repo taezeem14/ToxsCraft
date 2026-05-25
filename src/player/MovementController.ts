@@ -66,7 +66,7 @@ export class MovementController {
     const mouse = this.input.getAndResetMouseDeltas();
     const sensitivity = 0.0015; // sensitivity scale
     
-    this.player.yaw -= mouse.x * sensitivity;
+    this.player.yaw += mouse.x * sensitivity;
     this.player.pitch -= mouse.y * sensitivity;
     
     // Clamp vertical look pitch to prevent flipping upside down (-89 to +89 degrees)
@@ -97,7 +97,7 @@ export class MovementController {
     }
 
     // 4. Calculate move direction vectors based on yaw look angle
-    const forwardVec = new THREE.Vector3(Math.sin(this.player.yaw), 0, Math.cos(this.player.yaw)).normalize();
+    const forwardVec = new THREE.Vector3(Math.sin(this.player.yaw), 0, -Math.cos(this.player.yaw)).normalize();
     const rightVec = new THREE.Vector3().crossVectors(forwardVec, new THREE.Vector3(0, 1, 0)).normalize();
 
     let moveX = 0;

@@ -14,6 +14,7 @@ export class ChunkManager {
   private generator: WorldGenerator;
   private renderDistance = 8;
   public activeWorldId: string | undefined;
+  public currentDimension: 'overworld' | 'nether' = 'overworld';
 
   constructor(seed: string, renderDistance = 8, worldId?: string) {
     this.renderDistance = renderDistance;
@@ -121,14 +122,14 @@ export class ChunkManager {
       const chunk = new Chunk(mc.cx, mc.cz);
       
       // Look for locally cached or generated chunk first
-      this.generator.generateChunk(chunk);
+      this.generator.generateChunk(chunk, this.currentDimension);
       this.chunks.set(key, chunk);
       loaded.push(chunk);
       
       // Trigger an async load from database if activeWorldId is set
       if (this.activeWorldId) {
         import('../save/WorldDatabase').then(({ WorldDatabase }) => {
-          WorldDatabase.loadChunk(this.activeWorldId!, mc.cx, mc.cz).then(data => {
+          WorldDatabase.loadChunk(this.activeWorldId!, mc.cx, mc.cz, this.currentDimension).then(data => {
             if (data) {
               chunk.deserialize(data);
               // Trigger a dirty flag for the chunk mesh to update
@@ -171,7 +172,7 @@ export class ChunkManager {
       if (worldId) {
         try {
           const { WorldDatabase } = await import('../save/WorldDatabase');
-          const data = await WorldDatabase.loadChunk(worldId, cx, cz);
+          const data = await WorldDatabase.loadChunk(worldId, cx, cz, this.currentDimension);
           if (data) {
             chunk.deserialize(data);
             loaded = true;
@@ -182,7 +183,7 @@ export class ChunkManager {
       }
       
       if (!loaded) {
-        this.generator.generateChunk(chunk);
+        this.generator.generateChunk(chunk, this.currentDimension);
       }
       
       this.chunks.set(key, chunk);
