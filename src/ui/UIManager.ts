@@ -8,7 +8,6 @@ import { eventBus } from '../EventBus';
 import { settingsManager } from '../core/SettingsManager';
 import { WorldDatabase, WorldMetadata } from '../save/WorldDatabase';
 import { ItemStack, createItemStack } from '../inventory/ItemStack';
-import { getBiome } from '../world/generation/BiomeRegistry';
 import { AssetLoader } from '../core/AssetLoader';
 import { AchievementManager } from '../core/AchievementManager';
 
@@ -137,8 +136,8 @@ export class UIManager {
       this.game.togglePause();
     });
 
-    document.getElementById('btn-unstuck')!.addEventListener('click', () => {
-      this.game.player.teleportToSurface(this.game.chunkManager);
+    document.getElementById('btn-unstuck')!.addEventListener('click', async () => {
+      await this.game.player.teleportToSurface(this.game.chunkManager);
       this.game.togglePause();
     });
 
@@ -407,7 +406,7 @@ export class UIManager {
       document.getElementById('chunk-val')!.textContent = `${cx}, ${cz}`;
 
       // Biome look
-      const biome = getBiome(0.5, 0.5, p.y / 256.0); // simple mockup query
+      const biome = this.game.chunkManager.getBiomeAt(p.x, p.z);
       document.getElementById('biome-val')!.textContent = biome.name;
 
       // Time string

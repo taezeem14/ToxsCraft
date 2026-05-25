@@ -32,6 +32,7 @@
   justify-content: space-between;
   align-items: flex-end;
   padding: 20px;
+  padding-bottom: 75px; /* Lift above hotbar */
 }
 .mobile-controls.hidden {
   display: none !important;
@@ -60,26 +61,32 @@
 
 .mobile-buttons-right {
   display: grid;
-  grid-template-columns: repeat(3, min(60px, 15vw));
-  gap: 10px;
+  grid-template-columns: repeat(4, min(48px, 11vw)); /* 4 columns to avoid row overflow */
+  gap: 8px;
   pointer-events: auto;
 }
 
 .mobile-btn {
-  width: min(60px, 15vw);
-  height: min(60px, 15vw);
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  border-radius: 8px;
+  width: min(48px, 11vw);
+  height: min(48px, 11vw);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
   color: white;
-  font-family: var(--font-display);
-  font-size: 10px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: bold;
   text-align: center;
   touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
 }
 
 .mobile-btn:active {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.35);
+  border-color: rgba(255, 255, 255, 0.6);
 }
 
 body, html {
@@ -883,5 +890,52 @@ body, html {
 .achievement-status.locked-badge {
   background-color: #333;
   color: #888;
+}
+
+/* Responsive / Mobile scaling media queries */
+@media (max-width: 768px), (max-height: 500px) {
+  .game-logo {
+    font-size: 2.2rem !important;
+    margin-bottom: 4px !important;
+  }
+  
+  .splash-text {
+    font-size: 0.9rem !important;
+    margin-bottom: 15px !important;
+  }
+
+  .menu-card {
+    padding: 20px !important;
+    max-width: 360px !important;
+  }
+
+  .btn {
+    padding: 10px !important;
+    font-size: 1rem !important;
+    margin-bottom: 8px !important;
+  }
+  
+  /* Scale down HUD vitals and hotbar for narrow mobile widths */
+  .hotbar-slot {
+    width: 36px !important;
+    height: 36px !important;
+  }
+  
+  .hotbar-container {
+    padding: 3px !important;
+    gap: 3px !important;
+  }
+  
+  .status-row span {
+    font-size: 0.55rem !important;
+  }
+  
+  .xp-container span {
+    font-size: 0.6rem !important;
+  }
+
+  .mobile-controls {
+    padding-bottom: 65px !important; /* Slightly less padding-bottom since hotbar is shorter */
+  }
 }
 

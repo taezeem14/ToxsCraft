@@ -110,11 +110,11 @@ export const BIOMES: { [id: number]: BiomeDef } = {
     humidity: 0.3,
     baseHeight: 0.6,
     variation: 0.35,
-    surfaceBlock: 1, // Stone
-    subSurfaceBlock: 1, // Stone
-    treeChance: 0.01,
+    surfaceBlock: 3, // Grass Block
+    subSurfaceBlock: 2, // Dirt
+    treeChance: 0.02,
     treeType: 'spruce',
-    detailChance: 0.05,
+    detailChance: 0.08,
     fogColor: [0.8, 0.8, 0.85]
   },
   7: { // Swamp
@@ -203,7 +203,7 @@ export function getBiome(temp: number, humid: number, yVal: number): BiomeDef {
   }
 
   // Override mountains if height is high
-  if (yVal > 0.58) {
+  if (yVal > 0.63) {
     return BIOMES[6]; // Mountains
   }
 

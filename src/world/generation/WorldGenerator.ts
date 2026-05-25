@@ -91,7 +91,17 @@ export class WorldGenerator {
             if (y <= seaLevel + 1 && biome.id !== 2 && biome.id !== 9 && biome.id !== 10) {
               chunk.setBlock(x, y, z, 4); // Sand at water borders
             } else {
-              chunk.setBlock(x, y, z, biome.surfaceBlock);
+              if (biome.id === 6) { // Mountain biome
+                if (y > 115) {
+                  chunk.setBlock(x, y, z, 24); // Snow block top peaks
+                } else if (y > 90) {
+                  chunk.setBlock(x, y, z, 1); // Stone peaks
+                } else {
+                  chunk.setBlock(x, y, z, biome.surfaceBlock); // Grass slopes
+                }
+              } else {
+                chunk.setBlock(x, y, z, biome.surfaceBlock);
+              }
             }
           } else if (y <= seaLevel) {
             // Fill water up to sea level
@@ -424,5 +434,15 @@ export class WorldGenerator {
         }
       }
     }
+  }
+
+  /**
+   * Evaluates the biome at exact world coordinates
+   */
+  public getBiomeAt(wx: number, wz: number): BiomeDef {
+    const temp = (this.noiseBiomeTemp2D(wx * 0.001, wz * 0.001) + 1) * 0.5;
+    const humid = (this.noiseBiomeHum2D(wx * 0.001, wz * 0.001) + 1) * 0.5;
+    const cont = (this.noiseHeight2D(wx * 0.002, wz * 0.002) + 1) * 0.5;
+    return getBiome(temp, humid, cont);
   }
 }

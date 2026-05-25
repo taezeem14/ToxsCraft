@@ -7,6 +7,7 @@
 import { CHUNK_SIZE } from '../constants';
 import { Chunk } from './Chunk';
 import { WorldGenerator } from './generation/WorldGenerator';
+import { BiomeDef } from './generation/BiomeRegistry';
 
 export class ChunkManager {
   private chunks: Map<string, Chunk> = new Map();
@@ -204,5 +205,12 @@ export class ChunkManager {
 
   public clear(): void {
     this.chunks.clear();
+  }
+
+  /**
+   * Delegates biome evaluation to the world generator
+   */
+  public getBiomeAt(wx: number, wz: number): BiomeDef {
+    return this.generator.getBiomeAt(wx, wz);
   }
 }

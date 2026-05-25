@@ -97,7 +97,7 @@ export class MovementController {
     }
 
     // 4. Calculate move direction vectors based on yaw look angle
-    const forwardVec = new THREE.Vector3(-Math.sin(this.player.yaw), 0, -Math.cos(this.player.yaw)).normalize();
+    const forwardVec = new THREE.Vector3(Math.sin(this.player.yaw), 0, Math.cos(this.player.yaw)).normalize();
     const rightVec = new THREE.Vector3().crossVectors(forwardVec, new THREE.Vector3(0, 1, 0)).normalize();
 
     let moveX = 0;

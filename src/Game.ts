@@ -255,7 +255,7 @@ export class Game {
     const isStuck = Physics.checkCollision(this.player.position, this.player.radius, this.player.height, this.chunkManager);
     if (this.player.position.y < 12 || isStuck) {
       console.log(`Unstuck triggered on load: player was at Y=${this.player.position.y}, isStuck=${isStuck}`);
-      this.player.teleportToSurface(this.chunkManager);
+      await this.player.teleportToSurface(this.chunkManager);
     }
     
     // Mesh all active chunks on initial load to ensure the spawn chunks are rendered before gameplay begins

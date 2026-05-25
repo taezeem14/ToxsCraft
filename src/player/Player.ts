@@ -206,13 +206,13 @@ export class Player {
    * Teleports the player to the surface at their current X, Z coordinates.
    * Useful for loading into safe heights or recovering from physics/clipping bugs.
    */
-  public teleportToSurface(chunkManager: any): void {
+  public async teleportToSurface(chunkManager: any): Promise<void> {
     const px = Math.floor(this.position.x);
     const pz = Math.floor(this.position.z);
     
-    // Force load the chunk immediately
+    // Force load the chunk immediately (must await since it is async)
     const { cx, cz } = chunkManager.getChunkCoords(px, pz);
-    chunkManager.forceLoadChunk(cx, cz);
+    await chunkManager.forceLoadChunk(cx, cz);
     
     let spawnY = 80; // Safe fallback
 
