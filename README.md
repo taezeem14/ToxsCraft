@@ -16,7 +16,7 @@
 [![Three.js](https://img.shields.io/badge/Three.js-r160+-black?style=for-the-badge&logo=threedotjs&logoColor=white)](https://threejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-Blazing_Fast-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
-[![GitHub_Pages](https://img.shields.io/badge/GitHub_Pages-100%25_Free-22c55e?style=for-the-badge&logo=githubpages&logoColor=white)](https://pages.github.com/)
+[![Vercel](https://img.shields.io/badge/Vercel-Deploy_Ready-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/)
 [![Firebase](https://img.shields.io/badge/Firebase-Serverless-ffca28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com/)
 [![WebGL](https://img.shields.io/badge/WebGL-Powered-990000?style=for-the-badge&logo=webgl&logoColor=white)](https://www.khronos.org/webgl/)
 [![License](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](./LICENSE)
@@ -127,7 +127,7 @@ Tox'sCraft generates **11 distinct biomes**, each with unique terrain height, bl
 | 🔊 **Audio** | Web Audio API | Pentatonic soundscapes + block SFX synthesized in real-time |
 | 🎨 **Shaders** | Custom GLSL (Vert/Frag) | Ambient occlusion, waving water, glowing lava — pure drip |
 | 🧱 **Physics** | Custom Sweep AABB | Zero clipping, buttery smooth collision resolution |
-| 🚀 **Hosting** | [GitHub Pages](https://pages.github.com/) | 100% Free hosting powered by auto-run GitHub Actions CI |
+| 🚀 **Hosting** | [Vercel](https://vercel.com/) | 100% Free static frontend web hosting + global CDN with auto-deployment from Git |
 
 ---
 
@@ -180,14 +180,14 @@ pnpm preview
 
 ---
 
-## 🚀 Deploy to GitHub Pages — *100% Free, Auto-Deploy*
+## 🚀 Deploy to Vercel — *100% Free Static Hosting*
 
-Tox'sCraft is set up for **GitHub Pages** deployment with GitHub Actions. It is 100% free of charge:
+Tox'sCraft is fully optimized for **Vercel** static deployment. It is 100% free of charge:
 
 1. Push your changes to the `main` branch of your GitHub repository.
-2. The included GitHub Actions workflow will build the static client and automatically deploy it to the `gh-pages` branch.
-3. Enable GitHub Pages on your repository settings (Settings -> Pages -> Build and deployment -> Source: Deploy from a branch, Branch: `gh-pages` / `/root`).
-4. Your game will be live in a few minutes at `https://<your-username>.github.io/ToxsCraft/`! 🌐✨
+2. Link your GitHub repository to Vercel.
+3. Vercel will automatically build (`pnpm run build` with output directory `dist`) and deploy the game on every commit.
+4. Your game will be live in seconds at `https://<your-project>.vercel.app`! 🌐✨
 
 ---
 

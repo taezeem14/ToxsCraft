@@ -1,7 +1,7 @@
 const CACHE_NAME = 'toxscraft-v1';
 const ASSETS = [
-  './',
-  './index.html'
+  '/',
+  '/index.html'
 ];
 
 self.addEventListener('install', (e) => {
@@ -34,7 +34,7 @@ self.addEventListener('fetch', (e) => {
         return response;
       }).catch(() => {
         // Fallback for offline mode
-        return caches.match('./index.html');
+        return caches.match('/index.html');
       });
     })
   );
