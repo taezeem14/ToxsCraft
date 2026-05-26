@@ -3,6 +3,7 @@ uniform sampler2D uTextureAtlas;
 uniform float uSunlightIntensity; // 0.1 to 1.0 depending on time of day
 uniform vec3 uFogColor;
 uniform float uFogDensity;
+uniform float uOpacity;
 
 varying vec2 vUv;
 varying vec3 vColor; // Baked Ambient Occlusion (AO) from GreedyMesher
@@ -30,5 +31,5 @@ void main() {
     
     vec3 finalColor = mix(litColor, uFogColor, fogFactor);
 
-    gl_FragColor = vec4(finalColor, texColor.a);
+    gl_FragColor = vec4(finalColor, texColor.a * uOpacity);
 }

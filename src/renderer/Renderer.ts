@@ -35,6 +35,7 @@ export class Renderer {
   // Mesh pools: chunkKey -> Mesh
   private solidMeshes: Map<string, THREE.Mesh> = new Map();
   private transparentMeshes: Map<string, THREE.Mesh> = new Map();
+  private activeFades: Map<string, { mesh: THREE.Mesh; mat: THREE.ShaderMaterial; progress: number }> = new Map();
 
   // Player Model Group and Limb Meshes
   public playerGroup: THREE.Group | null = null;
@@ -112,7 +113,8 @@ export class Renderer {
       uSunlightIntensity: { value: 1.0 },
       uFogColor: { value: new THREE.Color() },
       uFogDensity: { value: 0.0035 }, // smooth horizon fading
-      uTime: { value: 0 }
+      uTime: { value: 0 },
+      uOpacity: { value: 1.0 }
     };
 
     // 1. Solid Blocks material (opaque + alpha-solid like leaves/glass/ice)
@@ -155,31 +157,67 @@ export class Renderer {
    */
   public updateChunkMesh(cx: number, cz: number, solidData: any, transparentData: any): void {
     const key = `${cx},${cz}`;
+    const isNewSolid = !this.solidMeshes.has(key);
+    const isNewTransparent = !this.transparentMeshes.has(key);
 
     // 1. Update solid mesh
     this.removeChunkMesh(cx, cz); // clear old
 
     if (solidData.positions.length > 0) {
       const geom = this.buildGeometry(solidData);
-      const mesh = new THREE.Mesh(geom, this.blockMaterial);
+      let mat: THREE.Material = this.blockMaterial;
+      
+      if (isNewSolid) {
+        const clonedMat = this.blockMaterial.clone();
+        clonedMat.transparent = true;
+        clonedMat.uniforms = THREE.UniformsUtils.clone(this.blockMaterial.uniforms);
+        clonedMat.uniforms.uOpacity = { value: 0.0 };
+        mat = clonedMat;
+      }
+      
+      const mesh = new THREE.Mesh(geom, mat);
       mesh.position.set(cx * CHUNK_SIZE, 0, cz * CHUNK_SIZE);
       mesh.receiveShadow = true;
       mesh.castShadow = true;
       
       this.scene.add(mesh);
       this.solidMeshes.set(key, mesh);
+
+      if (isNewSolid && mat !== this.blockMaterial) {
+        this.activeFades.set(key + '_solid', {
+          mesh,
+          mat: mat as THREE.ShaderMaterial,
+          progress: 0
+        });
+      }
     }
 
     // 2. Update transparent mesh (water / lava only — fluid blocks)
-    // These use depthWrite:false to prevent sorting artifacts with overlapping
-    // fluid surfaces. Leaves/glass/ice are handled in the solid pass above.
     if (transparentData.positions.length > 0) {
       const geom = this.buildGeometry(transparentData);
-      const mesh = new THREE.Mesh(geom, this.waterMaterial);
+      let mat: THREE.Material = this.waterMaterial;
+      
+      if (isNewTransparent) {
+        const clonedMat = this.waterMaterial.clone();
+        clonedMat.transparent = true;
+        clonedMat.uniforms = THREE.UniformsUtils.clone(this.waterMaterial.uniforms);
+        clonedMat.uniforms.uOpacity = { value: 0.0 };
+        mat = clonedMat;
+      }
+      
+      const mesh = new THREE.Mesh(geom, mat);
       mesh.position.set(cx * CHUNK_SIZE, 0, cz * CHUNK_SIZE);
       
       this.scene.add(mesh);
       this.transparentMeshes.set(key, mesh);
+
+      if (isNewTransparent && mat !== this.waterMaterial) {
+        this.activeFades.set(key + '_trans', {
+          mesh,
+          mat: mat as THREE.ShaderMaterial,
+          progress: 0
+        });
+      }
     }
   }
 
@@ -213,6 +251,9 @@ export class Renderer {
     if (solidMesh) {
       this.scene.remove(solidMesh);
       solidMesh.geometry.dispose();
+      if (solidMesh.material !== this.blockMaterial) {
+        (solidMesh.material as THREE.Material).dispose();
+      }
       this.solidMeshes.delete(key);
     }
 
@@ -221,8 +262,14 @@ export class Renderer {
     if (transMesh) {
       this.scene.remove(transMesh);
       transMesh.geometry.dispose();
+      if (transMesh.material !== this.waterMaterial) {
+        (transMesh.material as THREE.Material).dispose();
+      }
       this.transparentMeshes.delete(key);
     }
+    
+    this.activeFades.delete(key + '_solid');
+    this.activeFades.delete(key + '_trans');
   }
 
   private onWindowResize = (): void => {
@@ -231,7 +278,28 @@ export class Renderer {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   };
 
-  public render(timeOfDay: number, playerPos: THREE.Vector3, gameTime: number, isNether = false): void {
+  private tickFadeAnimations(deltaSec: number): void {
+    const fadeDuration = 0.3; // 300ms fade
+    for (const [fadeKey, fade] of this.activeFades.entries()) {
+      fade.progress += deltaSec;
+      const opacity = Math.min(1.0, fade.progress / fadeDuration);
+      fade.mat.uniforms.uOpacity.value = opacity;
+      
+      // Update sun intensity and fog uniforms on the cloned materials
+      fade.mat.uniforms.uSunlightIntensity.value = this.blockMaterial.uniforms.uSunlightIntensity.value;
+      fade.mat.uniforms.uFogColor.value.copy(this.blockMaterial.uniforms.uFogColor.value);
+      fade.mat.uniforms.uFogDensity.value = this.blockMaterial.uniforms.uFogDensity.value;
+      fade.mat.uniforms.uTime.value = this.waterMaterial.uniforms.uTime.value;
+
+      if (fade.progress >= fadeDuration) {
+        fade.mesh.material = fadeKey.endsWith('_solid') ? this.blockMaterial : this.waterMaterial;
+        fade.mat.dispose();
+        this.activeFades.delete(fadeKey);
+      }
+    }
+  }
+
+  public render(timeOfDay: number, playerPos: THREE.Vector3, gameTime: number, isNether = false, deltaSec = 0.016): void {
     let fogColor: THREE.Color;
     let sunIntensity: number;
 
@@ -261,6 +329,9 @@ export class Renderer {
 
     this.lavaMaterial.uniforms.uFogColor.value.copy(fogColor);
     this.lavaMaterial.uniforms.uTime.value = gameTime * 0.001;
+
+    // Tick chunk fade opacity levels
+    this.tickFadeAnimations(deltaSec);
 
     if (!isNether) {
       // Center shadow frustum on player to save draw calls
@@ -553,6 +624,101 @@ export class Renderer {
       this.playerLeftArm!.rotation.x = 0;
       this.playerRightArm!.rotation.x = 0;
     }
+  }
+
+  public createRemotePlayerMesh(skinName: string, name: string): THREE.Group {
+    const group = new THREE.Group();
+    
+    // Geometries
+    const headGeom = new THREE.BoxGeometry(0.38, 0.38, 0.38);
+    const torsoGeom = new THREE.BoxGeometry(0.38, 0.6, 0.2);
+    
+    const armGeom = new THREE.BoxGeometry(0.16, 0.6, 0.16);
+    armGeom.translate(0, -0.3, 0); // pivot at shoulder
+    
+    const legGeom = new THREE.BoxGeometry(0.18, 0.75, 0.18);
+    legGeom.translate(0, -0.375, 0); // pivot at hip
+
+    const mats = this.createPlayerSkinMaterials(skinName);
+
+    const head = new THREE.Mesh(headGeom, mats.head);
+    head.position.set(0, 1.54, 0);
+    head.name = 'head';
+    group.add(head);
+
+    const torso = new THREE.Mesh(torsoGeom, mats.torso);
+    torso.position.set(0, 1.05, 0);
+    torso.name = 'torso';
+    group.add(torso);
+
+    const leftArm = new THREE.Mesh(armGeom, mats.arm);
+    leftArm.position.set(-0.28, 1.35, 0);
+    leftArm.name = 'leftArm';
+    group.add(leftArm);
+
+    const rightArm = new THREE.Mesh(armGeom.clone(), mats.arm);
+    rightArm.position.set(0.28, 1.35, 0);
+    rightArm.name = 'rightArm';
+    group.add(rightArm);
+
+    const leftLeg = new THREE.Mesh(legGeom, mats.leg);
+    leftLeg.position.set(-0.1, 0.75, 0);
+    leftLeg.name = 'leftLeg';
+    group.add(leftLeg);
+
+    const rightLeg = new THREE.Mesh(legGeom.clone(), mats.leg);
+    rightLeg.position.set(0.1, 0.75, 0);
+    rightLeg.name = 'rightLeg';
+    group.add(rightLeg);
+
+    // Shadows
+    head.castShadow = head.receiveShadow = true;
+    torso.castShadow = torso.receiveShadow = true;
+    leftArm.castShadow = leftArm.receiveShadow = true;
+    rightArm.castShadow = rightArm.receiveShadow = true;
+    leftLeg.castShadow = leftLeg.receiveShadow = true;
+    rightLeg.castShadow = rightLeg.receiveShadow = true;
+
+    // Create username tag (floating canvas billboard text sprite above head)
+    const nameTag = this.createUsernameTag(name);
+    nameTag.position.set(0, 1.95, 0);
+    nameTag.name = 'nameTag';
+    group.add(nameTag);
+
+    this.scene.add(group);
+    return group;
+  }
+
+  private createUsernameTag(name: string): THREE.Sprite {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d')!;
+    
+    // Draw rounded background semi-transparent black rectangle
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    
+    // Simple rounded rect check
+    if (ctx.roundRect) {
+      ctx.roundRect(10, 10, 236, 44, 8);
+    } else {
+      ctx.rect(10, 10, 236, 44);
+    }
+    ctx.fill();
+
+    // Draw text
+    ctx.font = 'bold 20px Outfit, sans-serif';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(name, 128, 32);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+    const sprite = new THREE.Sprite(spriteMaterial);
+    sprite.scale.set(1.2, 0.3, 1.2);
+    return sprite;
   }
 
   public clear(): void {

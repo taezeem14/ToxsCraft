@@ -25,28 +25,36 @@
   <div id="hud-overlay" class="ui-screen hidden">
     <!-- Top-Center Utility Bar -->
     <div id="hud-top-center" class="hud-top-center">
-      <button id="btn-hud-pov" class="hud-top-btn" title="Toggle POV">📷</button>
-      <button id="btn-hud-skins" class="hud-top-btn" title="Skins & Characters">👕</button>
       <button id="btn-hud-chat" class="hud-top-btn" title="Chat">💬</button>
       <button id="btn-hud-pause" class="hud-top-btn" title="Pause Game">⏸</button>
     </div>
 
     <!-- Mobile Controls Overlay -->
     <div id="mobile-controls" class="mobile-controls hidden">
-      <!-- Joystick Bottom-Left -->
-      <div id="joystick-container">
-        <div id="joystick-base">
-          <div id="joystick-knob"></div>
-        </div>
+      <!-- Classic D-Pad (Bottom-Left) -->
+      <div id="classic-dpad">
+        <button id="btn-dpad-up" class="dpad-btn dpad-up">▲</button>
+        <button id="btn-dpad-left" class="dpad-btn dpad-left">◀</button>
+        <button id="btn-dpad-center" class="dpad-btn dpad-center">◇</button>
+        <button id="btn-dpad-right" class="dpad-btn dpad-right">▶</button>
+        <button id="btn-dpad-down" class="dpad-btn dpad-down">▼</button>
       </div>
-      <div class="mobile-buttons-right">
-        <button id="btn-mobile-sprint" class="mobile-btn">SPRINT</button>
-        <button id="btn-mobile-jump" class="mobile-btn">JUMP</button>
-        <button id="btn-mobile-sneak" class="mobile-btn">SNEAK</button>
-        <button id="btn-mobile-attack" class="mobile-btn">ATTACK</button>
-        <button id="btn-mobile-place" class="mobile-btn">PLACE</button>
-        <button id="btn-mobile-fly" class="mobile-btn">FLY</button>
-        <button id="btn-mobile-inv" class="mobile-btn">INV</button>
+
+      <!-- Right Action Stack & Flight Panel -->
+      <div class="mobile-controls-right-container">
+        <!-- Flight Panel (Vertical stack next to Jump) -->
+        <div id="flight-controls-panel" class="flight-panel hidden">
+          <button id="btn-flight-higher" class="flight-btn flight-higher">▲</button>
+          <button id="btn-flight-stop" class="flight-btn flight-stop">✖</button>
+          <button id="btn-flight-lower" class="flight-btn flight-lower">▼</button>
+        </div>
+
+        <div class="action-buttons-stack">
+          <button id="btn-mobile-sprint" class="mobile-action-btn">SPRINT</button>
+          <button id="btn-mobile-attack" class="mobile-action-btn">ATTACK</button>
+          <button id="btn-mobile-place" class="mobile-action-btn">PLACE</button>
+          <button id="btn-mobile-jump" class="mobile-action-btn jump-btn">JUMP</button>
+        </div>
       </div>
     </div>
     <!-- Coordinates & F3 Debug info -->
@@ -76,18 +84,21 @@
         </div>
       </div>
       
-      <!-- 9-slot Hotbar -->
-      <div id="hotbar" class="hotbar-container">
-        <!-- Generated slots 0-8 -->
-        <div class="hotbar-slot selected" data-slot="0"><span class="slot-number">1</span></div>
-        <div class="hotbar-slot" data-slot="1"><span class="slot-number">2</span></div>
-        <div class="hotbar-slot" data-slot="2"><span class="slot-number">3</span></div>
-        <div class="hotbar-slot" data-slot="3"><span class="slot-number">4</span></div>
-        <div class="hotbar-slot" data-slot="4"><span class="slot-number">5</span></div>
-        <div class="hotbar-slot" data-slot="5"><span class="slot-number">6</span></div>
-        <div class="hotbar-slot" data-slot="6"><span class="slot-number">7</span></div>
-        <div class="hotbar-slot" data-slot="7"><span class="slot-number">8</span></div>
-        <div class="hotbar-slot" data-slot="8"><span class="slot-number">9</span></div>
+      <!-- Hotbar Wrapper -->
+      <div class="hotbar-wrapper">
+        <div id="hotbar" class="hotbar-container">
+          <!-- Generated slots 0-8 -->
+          <div class="hotbar-slot selected" data-slot="0"><span class="slot-number">1</span></div>
+          <div class="hotbar-slot" data-slot="1"><span class="slot-number">2</span></div>
+          <div class="hotbar-slot" data-slot="2"><span class="slot-number">3</span></div>
+          <div class="hotbar-slot" data-slot="3"><span class="slot-number">4</span></div>
+          <div class="hotbar-slot" data-slot="4"><span class="slot-number">5</span></div>
+          <div class="hotbar-slot" data-slot="5"><span class="slot-number">6</span></div>
+          <div class="hotbar-slot" data-slot="6"><span class="slot-number">7</span></div>
+          <div class="hotbar-slot" data-slot="7"><span class="slot-number">8</span></div>
+          <div class="hotbar-slot" data-slot="8"><span class="slot-number">9</span></div>
+        </div>
+        <button id="btn-mobile-dots" class="mobile-dots-btn">···</button>
       </div>
     </div>
   </div>
@@ -153,10 +164,23 @@
       <h2>Game Paused</h2>
       <div class="menu-buttons">
         <button id="btn-resume" class="btn btn-primary">Resume Game</button>
+        <button id="btn-pause-skins" class="btn">Skins & Characters</button>
+        <button id="btn-pause-pov" class="btn">Toggle POV</button>
         <button id="btn-unstuck" class="btn">Unstuck (Surface TP)</button>
         <button id="btn-achievements" class="btn">Achievements</button>
         <button id="btn-settings-pause" class="btn">Settings</button>
         <button id="btn-quit" class="btn">Save & Quit</button>
+      </div>
+
+      <!-- Multiplayer Connection Section -->
+      <div class="multiplayer-pause-box">
+        <h3>Multiplayer</h3>
+        <div class="form-group-row">
+          <input type="text" id="input-mp-server" placeholder="ws://localhost:8787" value="">
+          <input type="text" id="input-mp-username" placeholder="Username" value="Steve">
+        </div>
+        <button id="btn-mp-connect" class="btn btn-secondary">Connect</button>
+        <div id="mp-status-msg" class="mp-status">Offline</div>
       </div>
     </div>
   </div>

@@ -51,6 +51,16 @@ export class UIManager {
     this.initHUD();
     this.initInventoryUI();
 
+    // Pre-populate multiplayer inputs
+    const urlEl = document.getElementById('input-mp-server') as HTMLInputElement;
+    const userEl = document.getElementById('input-mp-username') as HTMLInputElement;
+    if (urlEl) {
+      urlEl.value = localStorage.getItem("mp_server_url") || "";
+    }
+    if (userEl) {
+      userEl.value = localStorage.getItem("mp_username") || "Steve";
+    }
+
     // Mouse tracking for cursor held item
     document.addEventListener('mousemove', (e) => {
       if (this.heldItem) {
@@ -178,23 +188,63 @@ export class UIManager {
     });
 
     // 6. HUD top center utility buttons
-    document.getElementById('btn-hud-pov')!.addEventListener('click', () => {
-      this.game.toggleCameraMode();
-    });
+    const btnChat = document.getElementById('btn-hud-chat');
+    if (btnChat) {
+      btnChat.addEventListener('click', () => {
+        if (this.game.multiplayerManager.getConnected()) {
+          const msg = prompt("Enter chat message:");
+          if (msg) {
+            this.game.multiplayerManager.sendChatMessage(msg);
+          }
+        } else {
+          this.showToast("Chat: Connect to a multiplayer server first.");
+        }
+      });
+    }
 
-    document.getElementById('btn-hud-skins')!.addEventListener('click', () => {
-      document.exitPointerLock();
-      this.showScreen('skinsScreen');
-      this.initSkinsSelectionUI();
-    });
+    const btnPause = document.getElementById('btn-hud-pause');
+    if (btnPause) {
+      btnPause.addEventListener('click', () => {
+        this.game.togglePause();
+      });
+    }
 
-    document.getElementById('btn-hud-chat')!.addEventListener('click', () => {
-      this.showToast("Chat: [System] Multiplayer server connection offline.");
-    });
+    // Pause screen Skins & POV bindings
+    const btnPauseSkins = document.getElementById('btn-pause-skins');
+    if (btnPauseSkins) {
+      btnPauseSkins.addEventListener('click', () => {
+        document.exitPointerLock();
+        this.showScreen('skinsScreen');
+        this.initSkinsSelectionUI();
+      });
+    }
 
-    document.getElementById('btn-hud-pause')!.addEventListener('click', () => {
-      this.game.togglePause();
-    });
+    const btnPausePov = document.getElementById('btn-pause-pov');
+    if (btnPausePov) {
+      btnPausePov.addEventListener('click', () => {
+        this.game.toggleCameraMode();
+      });
+    }
+
+    // Multiplayer connect button inside pause menu
+    const btnMpConnect = document.getElementById('btn-mp-connect');
+    if (btnMpConnect) {
+      btnMpConnect.addEventListener('click', () => {
+        if (this.game.multiplayerManager.getConnected()) {
+          this.game.multiplayerManager.disconnect();
+        } else {
+          const urlEl = document.getElementById('input-mp-server') as HTMLInputElement;
+          const userEl = document.getElementById('input-mp-username') as HTMLInputElement;
+          const url = urlEl.value || "ws://localhost:8787/ws";
+          const username = userEl.value || "Steve";
+          
+          localStorage.setItem("mp_server_url", url);
+          localStorage.setItem("mp_username", username);
+
+          this.game.multiplayerManager.connect(url, username);
+        }
+      });
+    }
 
     // 7. Skins Selection screen buttons
     document.getElementById('btn-skins-close')!.addEventListener('click', () => {

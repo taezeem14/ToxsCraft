@@ -3,6 +3,7 @@ uniform float uTime;
 uniform vec3 uFogColor;
 uniform float uFogDensity;
 uniform float uSunlightIntensity;
+uniform float uOpacity;
 
 varying vec2 vUv;
 varying vec3 vNormal;
@@ -32,5 +33,5 @@ void main() {
     
     vec3 finalColor = mix(litColor, uFogColor, fogFactor);
 
-    gl_FragColor = vec4(finalColor, waterColor.a);
+    gl_FragColor = vec4(finalColor, waterColor.a * uOpacity);
 }

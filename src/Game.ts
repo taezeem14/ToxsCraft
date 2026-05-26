@@ -23,6 +23,7 @@ import { MobManager } from './mobs/MobManager';
 import { MobEntity, MobType } from './mobs/MobEntity';
 import { settingsManager } from './core/SettingsManager';
 import { AchievementManager } from './core/AchievementManager';
+import { MultiplayerManager } from './core/MultiplayerManager';
 
 // Helper mapping inventory item IDs to block placement IDs
 const BLOCK_PLACEMENT_MAP: { [key: string]: number } = {
@@ -75,6 +76,7 @@ export class Game {
   public inputManager!: InputManager;
   public dayNightCycle!: DayNightCycle;
   public mobManager!: MobManager;
+  public multiplayerManager!: MultiplayerManager;
 
   // Active Save World State
   public activeWorld: WorldMetadata | null = null;
@@ -112,6 +114,7 @@ export class Game {
     this.inputManager = new InputManager(canvas);
     this.player = new Player();
     this.dayNightCycle = new DayNightCycle();
+    this.multiplayerManager = new MultiplayerManager(this);
 
     this.createSelectionBox();
     this.initEventListeners();
@@ -625,6 +628,7 @@ export class Game {
       this.movementController.update(deltaSec);
       this.player.update(deltaSec);
       this.mobManager.update(deltaSec, this.player, this.chunkManager);
+      this.multiplayerManager.update(now);
 
       // Portal Collision Check
       const px = Math.floor(this.player.position.x);
@@ -848,6 +852,7 @@ export class Game {
       // Mine success! Break block
       const oldBlockId = this.chunkManager.getBlock(this.miningTarget.x, this.miningTarget.y, this.miningTarget.z);
       this.chunkManager.setBlock(this.miningTarget.x, this.miningTarget.y, this.miningTarget.z, 0); // set to Air
+      eventBus.emit('block_broken', { x: this.miningTarget.x, y: this.miningTarget.y, z: this.miningTarget.z });
       AssetLoader.playSound('dig', block.id);
 
       // If we broke Obsidian or a Portal block, clear adjacent portals
@@ -919,6 +924,7 @@ export class Game {
     // Place block
     const oldBlockAtPlace = this.chunkManager.getBlock(px, py, pz);
     this.chunkManager.setBlock(px, py, pz, blockIdToPlace);
+    eventBus.emit('block_placed', { x: px, y: py, z: pz, blockId: blockIdToPlace });
     if (oldBlockAtPlace === 72) {
       this.clearPortal(px, py, pz);
     }

@@ -41,90 +41,59 @@ export class InputManager {
       if (!state && wasDown) eventBus.emit('keyup', code);
     };
 
-    // Virtual Touch Joystick
-    const joystickBase = document.getElementById('joystick-base');
-    const joystickKnob = document.getElementById('joystick-knob');
-    
-    if (joystickBase && joystickKnob) {
-      let joystickActive = false;
-      let startX = 0;
-      let startY = 0;
-      const maxDistance = 40; // max displacement in pixels
-
-      joystickBase.addEventListener('touchstart', (e) => {
+    // Bind classic D-pad direction buttons
+    const bindDpad = (id: string, code: string) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      
+      const onStart = (e: TouchEvent) => {
         e.preventDefault();
-        joystickActive = true;
-        const rect = joystickBase.getBoundingClientRect();
-        startX = rect.left + rect.width / 2;
-        startY = rect.top + rect.height / 2;
-      });
+        setVirtualKey(code, true);
+        btn.classList.add('active');
+      };
+      
+      const onEnd = (e: TouchEvent) => {
+        e.preventDefault();
+        setVirtualKey(code, false);
+        btn.classList.remove('active');
+      };
+      
+      btn.addEventListener('touchstart', onStart);
+      btn.addEventListener('touchend', onEnd);
+      btn.addEventListener('touchcancel', onEnd);
+    };
 
-      const handleJoystickMove = (clientX: number, clientY: number) => {
-        if (!joystickActive) return;
-        let deltaX = clientX - startX;
-        let deltaY = clientY - startY;
-        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    bindDpad('btn-dpad-up', 'KeyW');
+    bindDpad('btn-dpad-left', 'KeyA');
+    bindDpad('btn-dpad-right', 'KeyD');
+    bindDpad('btn-dpad-down', 'KeyS');
 
-        if (distance > maxDistance) {
-          deltaX = (deltaX / distance) * maxDistance;
-          deltaY = (deltaY / distance) * maxDistance;
+    // Bind D-pad Center crouch toggle button
+    const btnCenter = document.getElementById('btn-dpad-center');
+    if (btnCenter) {
+      let isCrouching = false;
+      btnCenter.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        isCrouching = !isCrouching;
+        setVirtualKey('ShiftLeft', isCrouching);
+        
+        if (isCrouching) {
+          btnCenter.classList.add('active');
+          btnCenter.textContent = '◆'; // filled diamond when crouching
+        } else {
+          btnCenter.classList.remove('active');
+          btnCenter.textContent = '◇'; // hollow diamond when standing
         }
-
-        joystickKnob.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
-
-        // Convert delta coordinates to virtual WASD keys
-        const xPct = deltaX / maxDistance;
-        const yPct = deltaY / maxDistance;
-
-        // Reset
-        setVirtualKey('KeyW', false);
-        setVirtualKey('KeyS', false);
-        setVirtualKey('KeyA', false);
-        setVirtualKey('KeyD', false);
-
-        // Apply deadzone and directions (threshold 0.3)
-        if (yPct < -0.3) setVirtualKey('KeyW', true);
-        if (yPct > 0.3) setVirtualKey('KeyS', true);
-        if (xPct < -0.3) setVirtualKey('KeyA', true);
-        if (xPct > 0.3) setVirtualKey('KeyD', true);
-      };
-
-      joystickBase.addEventListener('touchmove', (e) => {
-        e.preventDefault();
-        const touch = e.targetTouches[0];
-        handleJoystickMove(touch.clientX, touch.clientY);
-      });
-
-      const resetJoystick = () => {
-        joystickActive = false;
-        joystickKnob.style.transform = 'translate(0px, 0px)';
-        setVirtualKey('KeyW', false);
-        setVirtualKey('KeyS', false);
-        setVirtualKey('KeyA', false);
-        setVirtualKey('KeyD', false);
-      };
-
-      joystickBase.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        resetJoystick();
-      });
-
-      joystickBase.addEventListener('touchcancel', (e) => {
-        e.preventDefault();
-        resetJoystick();
       });
     }
 
-    // Touch look tracking for right half of screen
+    // Touch look tracking outside D-pad and Hotbar
     document.addEventListener('touchstart', (e) => {
       const target = e.target as HTMLElement;
-      // Do not look track if touch is on button or inside joystick container
-      if (target.tagName !== 'BUTTON' && !target.closest('#joystick-container') && !target.closest('#joystick-base')) {
+      if (target.tagName !== 'BUTTON' && !target.closest('#classic-dpad') && !target.closest('.hotbar-wrapper')) {
         const touch = e.changedTouches[0];
-        if (touch.clientX > window.innerWidth / 2) {
-          (this as any).lastTouchX = touch.clientX;
-          (this as any).lastTouchY = touch.clientY;
-        }
+        (this as any).lastTouchX = touch.clientX;
+        (this as any).lastTouchY = touch.clientY;
       }
     }, { passive: false });
 
@@ -132,16 +101,18 @@ export class InputManager {
       if ((this as any).lastTouchX !== undefined) {
         let touch: Touch | null = null;
         for (let i = 0; i < e.touches.length; i++) {
-          if (e.touches[i].clientX > window.innerWidth / 2 && (e.target as HTMLElement).tagName !== 'BUTTON') {
-            touch = e.touches[i];
+          const t = e.touches[i];
+          const target = t.target as HTMLElement;
+          if (target.tagName !== 'BUTTON' && !target.closest('#classic-dpad') && !target.closest('.hotbar-wrapper')) {
+            touch = t;
             break;
           }
         }
         if (touch) {
           const deltaX = touch.clientX - (this as any).lastTouchX;
           const deltaY = touch.clientY - (this as any).lastTouchY;
-          this.mouseDeltaX += deltaX * 2.0; // sensitivity scale
-          this.mouseDeltaY += deltaY * 2.0;
+          this.mouseDeltaX += deltaX * 1.5; // sensitivity scale
+          this.mouseDeltaY += deltaY * 1.5;
           (this as any).lastTouchX = touch.clientX;
           (this as any).lastTouchY = touch.clientY;
         }
@@ -155,7 +126,7 @@ export class InputManager {
     document.addEventListener('touchend', endTouchLook);
     document.addEventListener('touchcancel', endTouchLook);
 
-    // Right Action Buttons
+    // Generic Action Button binder
     const bindBtn = (id: string, code: string) => {
       const btn = document.getElementById(id);
       if (!btn) return;
@@ -164,26 +135,65 @@ export class InputManager {
       btn.addEventListener('touchcancel', (e) => { e.preventDefault(); setVirtualKey(code, false); });
     };
 
-    bindBtn('btn-mobile-jump', 'Space');
-    bindBtn('btn-mobile-sneak', 'ShiftLeft');
     bindBtn('btn-mobile-sprint', 'ControlLeft');
+    bindBtn('btn-flight-higher', 'Space');
+    bindBtn('btn-flight-lower', 'ShiftLeft');
 
-    // Fly button double taps space
-    const btnFly = document.getElementById('btn-mobile-fly');
-    if (btnFly) {
-      btnFly.addEventListener('touchstart', (e) => {
+    // Jump button with double-tap flying toggle
+    const btnJump = document.getElementById('btn-mobile-jump');
+    if (btnJump) {
+      let lastJumpTap = 0;
+      btnJump.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        eventBus.emit('keydown', 'Space');
-        setTimeout(() => eventBus.emit('keyup', 'Space'), 50);
-        setTimeout(() => eventBus.emit('keydown', 'Space'), 100);
-        setTimeout(() => eventBus.emit('keyup', 'Space'), 150);
+        setVirtualKey('Space', true);
+        const now = performance.now();
+        if (now - lastJumpTap < 300) {
+          // Double tap detected: simulate a quick space press sequence to toggle flight
+          setTimeout(() => {
+            setVirtualKey('Space', false);
+            setTimeout(() => {
+              setVirtualKey('Space', true);
+              setTimeout(() => {
+                setVirtualKey('Space', false);
+              }, 50);
+            }, 50);
+          }, 50);
+        }
+        lastJumpTap = now;
+      });
+      btnJump.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        setVirtualKey('Space', false);
+      });
+      btnJump.addEventListener('touchcancel', (e) => {
+        e.preventDefault();
+        setVirtualKey('Space', false);
       });
     }
 
-    // Inventory button toggle
-    const btnInv = document.getElementById('btn-mobile-inv');
-    if (btnInv) {
-      btnInv.addEventListener('touchstart', (e) => {
+    // Stop flight button simulation
+    const btnStop = document.getElementById('btn-flight-stop');
+    if (btnStop) {
+      btnStop.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        // Simulate double-press on Space to toggle flight off
+        setVirtualKey('Space', true);
+        setTimeout(() => {
+          setVirtualKey('Space', false);
+          setTimeout(() => {
+            setVirtualKey('Space', true);
+            setTimeout(() => {
+              setVirtualKey('Space', false);
+            }, 50);
+          }, 50);
+        }, 50);
+      });
+    }
+
+    // Inventory Triple Dot toggling E key
+    const btnDots = document.getElementById('btn-mobile-dots');
+    if (btnDots) {
+      btnDots.addEventListener('touchstart', (e) => {
         e.preventDefault();
         eventBus.emit('keydown', 'KeyE');
         setTimeout(() => eventBus.emit('keyup', 'KeyE'), 50);
@@ -216,6 +226,18 @@ export class InputManager {
         setTimeout(() => eventBus.emit('release_right'), 100);
       });
     }
+
+    // Listen to status messages to show/hide flight panel
+    eventBus.on('status_message', (msg: string) => {
+      const flightPanel = document.getElementById('flight-controls-panel');
+      if (flightPanel) {
+        if (msg === 'Flight Enabled') {
+          flightPanel.classList.remove('hidden');
+        } else if (msg === 'Flight Disabled') {
+          flightPanel.classList.add('hidden');
+        }
+      }
+    });
   }
 
 
