@@ -36,6 +36,17 @@ export class Renderer {
   private solidMeshes: Map<string, THREE.Mesh> = new Map();
   private transparentMeshes: Map<string, THREE.Mesh> = new Map();
 
+  // Player Model Group and Limb Meshes
+  public playerGroup: THREE.Group | null = null;
+  private playerHead: THREE.Mesh | null = null;
+  private playerTorso: THREE.Mesh | null = null;
+  private playerLeftArm: THREE.Mesh | null = null;
+  private playerRightArm: THREE.Mesh | null = null;
+  private playerLeftLeg: THREE.Mesh | null = null;
+  private playerRightLeg: THREE.Mesh | null = null;
+  private skinMaterialsCache: Map<string, { head: THREE.Material; torso: THREE.Material; arm: THREE.Material; leg: THREE.Material }> = new Map();
+  private currentSkinName: string = '';
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.scene = new THREE.Scene();
@@ -281,9 +292,276 @@ export class Renderer {
     }
   }
 
+  /* Player Model Helpers & Procedural Skin Generators */
+  private createPlayerSkinMaterials(skinName: string) {
+    let headColor = '#e0a980'; // skin
+    let hairColor = '#604020'; // brown
+    let eyeColor = '#305080'; // blue
+    let torsoColor = '#00a0a0'; // cyan
+    let armColor = '#00a0a0'; // cyan sleeve, skin hand
+    let legColor = '#3040a0'; // blue pants, grey shoes
+
+    if (skinName === 'alex') {
+      headColor = '#f5c09e';
+      hairColor = '#d06010'; // orange
+      eyeColor = '#307040'; // green
+      torsoColor = '#508030'; // green
+      armColor = '#508030';
+      legColor = '#705030'; // brown
+    } else if (skinName === 'herobrine') {
+      headColor = '#e0a980';
+      hairColor = '#604020';
+      eyeColor = '#ffffff'; // glowing white eyes
+      torsoColor = '#00a0a0';
+      armColor = '#00a0a0';
+      legColor = '#3040a0';
+    } else if (skinName === 'muhammad') {
+      headColor = '#e0a980';
+      hairColor = '#4a2c11';
+      eyeColor = '#4b88b0';
+      torsoColor = '#6c3483'; // royal purple robe
+      armColor = '#6c3483';
+      legColor = '#6c3483'; // purple pants
+    }
+
+    const makeTexture = (drawFn: (ctx: CanvasRenderingContext2D) => void) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d')!;
+      drawFn(ctx);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.magFilter = THREE.NearestFilter;
+      texture.minFilter = THREE.NearestFilter;
+      return texture;
+    };
+
+    // Draw Head
+    const headTex = makeTexture((ctx) => {
+      ctx.fillStyle = headColor;
+      ctx.fillRect(0, 0, 64, 64);
+      // Hair
+      ctx.fillStyle = hairColor;
+      ctx.fillRect(0, 0, 64, 20); // Top hair
+      ctx.fillRect(0, 20, 16, 20); // Side hair
+      ctx.fillRect(48, 20, 16, 20);
+      // Eyes
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(14, 28, 8, 6);
+      ctx.fillRect(42, 28, 8, 6);
+      ctx.fillStyle = eyeColor;
+      if (skinName !== 'herobrine') {
+        ctx.fillRect(18, 28, 4, 6);
+        ctx.fillRect(42, 28, 4, 6);
+      } else {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(14, 28, 8, 6);
+        ctx.fillRect(42, 28, 8, 6);
+      }
+      // Mouth
+      if (skinName !== 'herobrine') {
+        ctx.fillStyle = '#a05040';
+        ctx.fillRect(24, 44, 16, 4);
+      }
+      // Crown for Muhammad
+      if (skinName === 'muhammad') {
+        ctx.fillStyle = '#f1c40f'; // Gold crown
+        ctx.fillRect(6, 0, 52, 10);
+        ctx.fillRect(10, 10, 6, 6);
+        ctx.fillRect(29, 10, 6, 6);
+        ctx.fillRect(48, 10, 6, 6);
+      }
+    });
+
+    // Draw Torso
+    const torsoTex = makeTexture((ctx) => {
+      ctx.fillStyle = torsoColor;
+      ctx.fillRect(0, 0, 64, 64);
+      if (skinName === 'muhammad') {
+        // Gold trim for royal robes
+        ctx.fillStyle = '#f1c40f';
+        ctx.fillRect(0, 0, 64, 6);
+        ctx.fillRect(28, 6, 8, 58); // vertical sash
+      }
+    });
+
+    // Draw Arm
+    const armTex = makeTexture((ctx) => {
+      ctx.fillStyle = armColor;
+      ctx.fillRect(0, 0, 64, 44); // sleeve
+      ctx.fillStyle = headColor;
+      ctx.fillRect(0, 44, 64, 20); // hand
+      if (skinName === 'muhammad') {
+        ctx.fillStyle = '#f1c40f';
+        ctx.fillRect(0, 40, 64, 4); // gold cuff
+      }
+    });
+
+    // Draw Leg
+    const legTex = makeTexture((ctx) => {
+      ctx.fillStyle = legColor;
+      ctx.fillRect(0, 0, 64, 52); // pants
+      ctx.fillStyle = '#444444';
+      ctx.fillRect(0, 52, 64, 12); // shoes
+      if (skinName === 'muhammad') {
+        ctx.fillStyle = '#f1c40f';
+        ctx.fillRect(0, 0, 64, 4); // gold stripe
+      }
+    });
+
+    return {
+      head: new THREE.MeshLambertMaterial({ map: headTex }),
+      torso: new THREE.MeshLambertMaterial({ map: torsoTex }),
+      arm: new THREE.MeshLambertMaterial({ map: armTex }),
+      leg: new THREE.MeshLambertMaterial({ map: legTex })
+    };
+  }
+
+  public initPlayerModel(): void {
+    this.playerGroup = new THREE.Group();
+    
+    // Create geometries with offset pivots for natural limb swinging
+    const headGeom = new THREE.BoxGeometry(0.38, 0.38, 0.38);
+    const torsoGeom = new THREE.BoxGeometry(0.38, 0.6, 0.2);
+    
+    const armGeom = new THREE.BoxGeometry(0.16, 0.6, 0.16);
+    armGeom.translate(0, -0.3, 0); // pivot at shoulder
+    
+    const legGeom = new THREE.BoxGeometry(0.18, 0.75, 0.18);
+    legGeom.translate(0, -0.375, 0); // pivot at hip
+
+    this.playerHead = new THREE.Mesh(headGeom);
+    this.playerTorso = new THREE.Mesh(torsoGeom);
+    this.playerLeftArm = new THREE.Mesh(armGeom);
+    this.playerRightArm = new THREE.Mesh(armGeom.clone());
+    this.playerLeftLeg = new THREE.Mesh(legGeom);
+    this.playerRightLeg = new THREE.Mesh(legGeom.clone());
+
+    // Assemble player model hierarchy
+    this.playerGroup.add(this.playerHead);
+    this.playerGroup.add(this.playerTorso);
+    this.playerGroup.add(this.playerLeftArm);
+    this.playerGroup.add(this.playerRightArm);
+    this.playerGroup.add(this.playerLeftLeg);
+    this.playerGroup.add(this.playerRightLeg);
+
+    // Initial positions relative to group center
+    this.playerHead.position.set(0, 1.54, 0);
+    this.playerTorso.position.set(0, 1.05, 0);
+    this.playerLeftArm.position.set(-0.28, 1.35, 0);
+    this.playerRightArm.position.set(0.28, 1.35, 0);
+    this.playerLeftLeg.position.set(-0.1, 0.75, 0);
+    this.playerRightLeg.position.set(0.1, 0.75, 0);
+
+    // Enable shadows
+    this.playerHead.castShadow = true;
+    this.playerHead.receiveShadow = true;
+    this.playerTorso.castShadow = true;
+    this.playerTorso.receiveShadow = true;
+    this.playerLeftArm.castShadow = true;
+    this.playerLeftArm.receiveShadow = true;
+    this.playerRightArm.castShadow = true;
+    this.playerRightArm.receiveShadow = true;
+    this.playerLeftLeg.castShadow = true;
+    this.playerLeftLeg.receiveShadow = true;
+    this.playerRightLeg.castShadow = true;
+    this.playerRightLeg.receiveShadow = true;
+
+    this.scene.add(this.playerGroup);
+  }
+
+  private applyPlayerSkin(skinName: string): void {
+    let mats = this.skinMaterialsCache.get(skinName);
+    if (!mats) {
+      mats = this.createPlayerSkinMaterials(skinName);
+      this.skinMaterialsCache.set(skinName, mats);
+    }
+
+    this.playerHead!.material = mats.head;
+    this.playerTorso!.material = mats.torso;
+    this.playerLeftArm!.material = mats.arm;
+    this.playerRightArm!.material = mats.arm;
+    this.playerLeftLeg!.material = mats.leg;
+    this.playerRightLeg!.material = mats.leg;
+
+    this.currentSkinName = skinName;
+  }
+
+  public updatePlayerModel(
+    pos: THREE.Vector3,
+    yaw: number,
+    pitch: number,
+    velocity: THREE.Vector3,
+    skinName: string,
+    cameraMode: string,
+    isSneaking: boolean,
+    time: number
+  ): void {
+    if (!this.playerGroup) {
+      this.initPlayerModel();
+    }
+
+    if (cameraMode === 'first') {
+      this.playerGroup!.visible = false;
+      return;
+    }
+    this.playerGroup!.visible = true;
+
+    if (this.currentSkinName !== skinName) {
+      this.applyPlayerSkin(skinName);
+    }
+
+    // Set model position
+    this.playerGroup!.position.copy(pos);
+    
+    // Rotate player model horizontally (offset Math.PI for direct camera alignment)
+    this.playerGroup!.rotation.y = yaw + Math.PI;
+
+    // Head tilts vertically
+    this.playerHead!.rotation.x = -pitch;
+
+    // Sneaking height adjustments and torso leaning
+    if (isSneaking) {
+      this.playerTorso!.position.y = 0.95;
+      this.playerHead!.position.y = 1.4;
+      this.playerLeftArm!.position.y = 1.25;
+      this.playerRightArm!.position.y = 1.25;
+      this.playerTorso!.rotation.x = 0.25; // lean torso
+      this.playerHead!.position.z = 0.08;
+    } else {
+      this.playerTorso!.position.y = 1.05;
+      this.playerHead!.position.y = 1.54;
+      this.playerLeftArm!.position.y = 1.35;
+      this.playerRightArm!.position.y = 1.35;
+      this.playerTorso!.rotation.x = 0.0;
+      this.playerHead!.position.z = 0.0;
+    }
+
+    // Leg and arm swinging animation
+    const speed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
+    if (speed > 0.1) {
+      const swingSpeed = 12.0;
+      const swingAngle = 0.6 * Math.sin(time * 0.0015 * swingSpeed);
+
+      this.playerLeftLeg!.rotation.x = swingAngle;
+      this.playerRightLeg!.rotation.x = -swingAngle;
+      this.playerLeftArm!.rotation.x = -swingAngle;
+      this.playerRightArm!.rotation.x = swingAngle;
+    } else {
+      this.playerLeftLeg!.rotation.x = 0;
+      this.playerRightLeg!.rotation.x = 0;
+      this.playerLeftArm!.rotation.x = 0;
+      this.playerRightArm!.rotation.x = 0;
+    }
+  }
+
   public clear(): void {
     // Clean all loaded meshes
     this.clearAllMeshes();
+    if (this.playerGroup) {
+      this.scene.remove(this.playerGroup);
+      this.playerGroup = null;
+    }
     window.removeEventListener('resize', this.onWindowResize);
     this.renderer.dispose();
   }

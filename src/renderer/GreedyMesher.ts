@@ -235,7 +235,38 @@ export class GreedyMesher {
 
               // Set AO baked color (RGB same multiplier)
               const shade = aoColors[i];
-              dest.colors.push(shade, shade, shade);
+              
+              let r = shade;
+              let g = shade;
+              let b = shade;
+
+              // Foliage coloring based on biome
+              const isGrassTop = (blockId === 3 && axis === 1 && !isBack);
+              const isLeaves = (blockId === 7 || blockId === 71);
+              const isTallGrass = (blockId === 41);
+
+              if (isGrassTop || isLeaves || isTallGrass) {
+                const wx = chunk.x * CHUNK_SIZE + vx;
+                const wz = chunk.z * CHUNK_SIZE + vz;
+                const biome = chunkManager.getBiomeAt(wx, wz);
+                
+                let grassCol = [0.45, 0.75, 0.35]; // default Plains (rich green)
+                if (biome.id === 1) grassCol = [0.35, 0.7, 0.3]; // Forest
+                else if (biome.id === 2) grassCol = [0.85, 0.8, 0.5]; // Desert (dry yellow-sand)
+                else if (biome.id === 3) grassCol = [0.6, 0.75, 0.65]; // Tundra (pale grayish-blue-green)
+                else if (biome.id === 5) grassCol = [0.2, 0.75, 0.15]; // Jungle (lush dark green)
+                else if (biome.id === 6) grassCol = [0.4, 0.7, 0.4]; // Mountains (cool green)
+                else if (biome.id === 7) grassCol = [0.4, 0.5, 0.3]; // Swamp (muddy olive-brown)
+                else if (biome.id === 8) grassCol = [0.7, 0.75, 0.35]; // Savanna (dry yellow-green)
+                else if (biome.id === 9) grassCol = [0.8, 0.45, 0.35]; // Badlands (orange-red terracotta)
+                else if (biome.id === 10) grassCol = [0.65, 0.6, 0.7]; // Mushroom (grayish mycelium purple)
+                
+                r *= grassCol[0];
+                g *= grassCol[1];
+                b *= grassCol[2];
+              }
+
+              dest.colors.push(r, g, b);
             }
 
             // Write index patterns (two triangles per quad)

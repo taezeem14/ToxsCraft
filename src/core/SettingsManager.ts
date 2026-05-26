@@ -16,6 +16,7 @@ export interface GameSettings {
   viewBobbing: boolean;
   autoJump: boolean;
   showCoordinates: boolean;
+  skin: string;
 }
 
 function detectSoftwareRenderer(): boolean {
@@ -56,7 +57,8 @@ const DEFAULT_SETTINGS: GameSettings = {
   shadows: false,
   viewBobbing: true,
   autoJump: false,
-  showCoordinates: true
+  showCoordinates: true,
+  skin: 'steve'
 };
 
 class SettingsManager {

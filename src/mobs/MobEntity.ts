@@ -708,6 +708,13 @@ export class MobEntity implements PhysicsEntity {
   // -------------------------------------------------------------
 
   public update(deltaSec: number, player: Player, chunkManager: ChunkManager, mobManager: any): void {
+    // Suspend updates if chunk is unloaded to prevent falling into void
+    const { cx, cz } = chunkManager.getChunkCoords(Math.floor(this.position.x), Math.floor(this.position.z));
+    if (!chunkManager.isChunkLoaded(cx, cz)) {
+      this.velocity.set(0, 0, 0);
+      return;
+    }
+
     this.stateTimer += deltaSec;
 
     // AI state updates

@@ -13,6 +13,7 @@ export class Chunk {
   public skyLight: Uint8Array;
   public blockLight: Uint8Array;
   public isDirty = false; // Set to true if chunk needs remeshing
+  public pendingMobSpawns: { type: string; x: number; y: number; z: number }[] = [];
 
   constructor(x: number, z: number) {
     this.x = x;

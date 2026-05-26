@@ -152,12 +152,12 @@ export class WorldGenerator {
         const wx = worldXOffset + x;
         const wz = worldZOffset + z;
 
-        // Biome factors
-        const temp = (this.noiseBiomeTemp2D(wx * 0.001, wz * 0.001) + 1) * 0.5;
-        const humid = (this.noiseBiomeHum2D(wx * 0.001, wz * 0.001) + 1) * 0.5;
+        // Biome factors (scaled down multiplier to increase biome frequency)
+        const temp = (this.noiseBiomeTemp2D(wx * 0.005, wz * 0.005) + 1) * 0.5;
+        const humid = (this.noiseBiomeHum2D(wx * 0.005, wz * 0.005) + 1) * 0.5;
         
-        // Base continent scale
-        const cont = (this.noiseHeight2D(wx * 0.002, wz * 0.002) + 1) * 0.5;
+        // Base continent scale (scaled down multiplier to increase mountain/valley frequency)
+        const cont = (this.noiseHeight2D(wx * 0.007, wz * 0.007) + 1) * 0.5;
         const biome = getBiome(temp, humid, cont);
         biomesInChunk[x + z * CHUNK_SIZE] = biome;
 
@@ -536,9 +536,9 @@ export class WorldGenerator {
    * Evaluates the biome at exact world coordinates
    */
   public getBiomeAt(wx: number, wz: number): BiomeDef {
-    const temp = (this.noiseBiomeTemp2D(wx * 0.001, wz * 0.001) + 1) * 0.5;
-    const humid = (this.noiseBiomeHum2D(wx * 0.001, wz * 0.001) + 1) * 0.5;
-    const cont = (this.noiseHeight2D(wx * 0.002, wz * 0.002) + 1) * 0.5;
+    const temp = (this.noiseBiomeTemp2D(wx * 0.005, wz * 0.005) + 1) * 0.5;
+    const humid = (this.noiseBiomeHum2D(wx * 0.005, wz * 0.005) + 1) * 0.5;
+    const cont = (this.noiseHeight2D(wx * 0.007, wz * 0.007) + 1) * 0.5;
     return getBiome(temp, humid, cont);
   }
 
@@ -557,15 +557,15 @@ export class WorldGenerator {
     if (sy < 63 || sy > 160) return;
 
     if (biome.id === 2) { // Desert -> Desert Temple
-      if (randVal < 0.02) {
+      if (randVal < 0.05) {
         this.buildDesertTemple(chunk, sy);
       }
     } else if (biome.id === 0 || biome.id === 8) { // Plains / Savanna -> Village Hut
-      if (randVal < 0.035) {
+      if (randVal < 0.08) {
         this.buildVillageHut(chunk, sy);
       }
     } else if (biome.id === 1 || biome.id === 6) { // Forest / Mountains -> Pillager Outpost
-      if (randVal < 0.015) {
+      if (randVal < 0.04) {
         this.buildPillagerOutpost(chunk, sy);
       }
     }
@@ -665,6 +665,11 @@ export class WorldGenerator {
 
     // Inside Chest
     chunk.setBlock(bx + 1, sy, bz + 3, 31);
+
+    // Push Villager mob spawn coordinates
+    const wx = chunk.x * CHUNK_SIZE + bx + 2;
+    const wz = chunk.z * CHUNK_SIZE + bz + 2;
+    chunk.pendingMobSpawns.push({ type: 'villager', x: wx, y: sy, z: wz });
   }
 
   private buildPillagerOutpost(chunk: Chunk, sy: number): void {
@@ -725,5 +730,10 @@ export class WorldGenerator {
 
     // Inside Chest
     chunk.setBlock(bx + 4, sy + 1, bz + 4, 31);
+
+    // Push Pillager mob spawn coordinates
+    const wx = chunk.x * CHUNK_SIZE + bx + 3;
+    const wz = chunk.z * CHUNK_SIZE + bz + 3;
+    chunk.pendingMobSpawns.push({ type: 'pillager', x: wx, y: sy + 1, z: wz });
   }
 }

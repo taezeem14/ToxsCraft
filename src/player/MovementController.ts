@@ -62,6 +62,13 @@ export class MovementController {
   public update(deltaSec: number): void {
     if (this.player.isDead) return;
 
+    // Suspend physics / gravity if ground chunk is not loaded yet
+    const { cx, cz } = this.chunkManager.getChunkCoords(this.player.position.x, this.player.position.z);
+    if (!this.chunkManager.isChunkLoaded(cx, cz)) {
+      this.player.velocity.set(0, 0, 0);
+      return;
+    }
+
     // 1. Process Mouse Look
     const mouse = this.input.getAndResetMouseDeltas();
     const sensitivity = 0.0015; // sensitivity scale

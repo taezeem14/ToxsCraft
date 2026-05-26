@@ -30,7 +30,8 @@ export class UIManager {
     inventoryScreen: document.getElementById('inventory-screen')!,
     deathScreen: document.getElementById('death-screen')!,
     creditsScreen: document.getElementById('credits-screen')!,
-    achievementsScreen: document.getElementById('achievements-screen')!
+    achievementsScreen: document.getElementById('achievements-screen')!,
+    skinsScreen: document.getElementById('skins-screen')!
   };
 
   // Held item state
@@ -174,6 +175,42 @@ export class UIManager {
       this.game.stop();
       this.hudOverlay.classList.add('hidden');
       this.showScreen('mainMenu');
+    });
+
+    // 6. HUD top center utility buttons
+    document.getElementById('btn-hud-pov')!.addEventListener('click', () => {
+      this.game.toggleCameraMode();
+    });
+
+    document.getElementById('btn-hud-skins')!.addEventListener('click', () => {
+      document.exitPointerLock();
+      this.showScreen('skinsScreen');
+      this.initSkinsSelectionUI();
+    });
+
+    document.getElementById('btn-hud-chat')!.addEventListener('click', () => {
+      this.showToast("Chat: [System] Multiplayer server connection offline.");
+    });
+
+    document.getElementById('btn-hud-pause')!.addEventListener('click', () => {
+      this.game.togglePause();
+    });
+
+    // 7. Skins Selection screen buttons
+    document.getElementById('btn-skins-close')!.addEventListener('click', () => {
+      this.hideAllScreens();
+      this.game.inputManager.requestLock();
+    });
+
+    const skinOptions = document.querySelectorAll('.skin-option');
+    skinOptions.forEach((option) => {
+      option.addEventListener('click', () => {
+        skinOptions.forEach(opt => opt.classList.remove('selected'));
+        option.classList.add('selected');
+        const skinName = option.getAttribute('data-skin') || 'steve';
+        settingsManager.set('skin', skinName);
+        eventBus.emit('show_toast', `Selected Skin: ${skinName.toUpperCase()}`);
+      });
     });
   }
 
@@ -904,6 +941,19 @@ export class UIManager {
         </div>
       `;
       listEl.appendChild(row);
+    });
+  }
+
+  private initSkinsSelectionUI(): void {
+    const activeSkin = settingsManager.getValue('skin') || 'steve';
+    const skinOptions = document.querySelectorAll('.skin-option');
+    skinOptions.forEach((option) => {
+      const name = option.getAttribute('data-skin');
+      if (name === activeSkin) {
+        option.classList.add('selected');
+      } else {
+        option.classList.remove('selected');
+      }
     });
   }
 }

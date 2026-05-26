@@ -23,24 +23,30 @@
 
   <!-- HUD Interface -->
   <div id="hud-overlay" class="ui-screen hidden">
+    <!-- Top-Center Utility Bar -->
+    <div id="hud-top-center" class="hud-top-center">
+      <button id="btn-hud-pov" class="hud-top-btn" title="Toggle POV">📷</button>
+      <button id="btn-hud-skins" class="hud-top-btn" title="Skins & Characters">👕</button>
+      <button id="btn-hud-chat" class="hud-top-btn" title="Chat">💬</button>
+      <button id="btn-hud-pause" class="hud-top-btn" title="Pause Game">⏸</button>
+    </div>
+
     <!-- Mobile Controls Overlay -->
     <div id="mobile-controls" class="mobile-controls hidden">
-      <!-- D-Pad Left -->
-      <div class="dpad-left" id="dpad-move">
-        <div class="dpad-btn dpad-up" id="btn-dpad-up">▲</div>
-        <div class="dpad-btn dpad-left-arrow" id="btn-dpad-left">◀</div>
-        <div class="dpad-btn dpad-center" id="btn-dpad-center">◆</div>
-        <div class="dpad-btn dpad-right-arrow" id="btn-dpad-right">▶</div>
-        <div class="dpad-btn dpad-down" id="btn-dpad-down">▼</div>
+      <!-- Joystick Bottom-Left -->
+      <div id="joystick-container">
+        <div id="joystick-base">
+          <div id="joystick-knob"></div>
+        </div>
       </div>
       <div class="mobile-buttons-right">
+        <button id="btn-mobile-sprint" class="mobile-btn">SPRINT</button>
         <button id="btn-mobile-jump" class="mobile-btn">JUMP</button>
         <button id="btn-mobile-sneak" class="mobile-btn">SNEAK</button>
+        <button id="btn-mobile-attack" class="mobile-btn">ATTACK</button>
+        <button id="btn-mobile-place" class="mobile-btn">PLACE</button>
         <button id="btn-mobile-fly" class="mobile-btn">FLY</button>
         <button id="btn-mobile-inv" class="mobile-btn">INV</button>
-        <button id="btn-mobile-menu" class="mobile-btn">MENU</button>
-        <button id="btn-mobile-break" class="mobile-btn">BREAK</button>
-        <button id="btn-mobile-place" class="mobile-btn">PLACE</button>
       </div>
     </div>
     <!-- Coordinates & F3 Debug info -->
@@ -304,6 +310,35 @@
       <p>Synth Audio powered by Web Audio API.</p>
       <div class="menu-actions">
         <button id="btn-credits-back" class="btn">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Skins Selection Screen -->
+  <div id="skins-screen" class="ui-screen menu-container hidden">
+    <div class="menu-card wide text-center">
+      <h2>Select Character Skin</h2>
+      <div class="skins-grid">
+        <div class="skin-option selected" data-skin="steve">
+          <div class="skin-preview steve-preview"></div>
+          <h3>Steve</h3>
+        </div>
+        <div class="skin-option" data-skin="alex">
+          <div class="skin-preview alex-preview"></div>
+          <h3>Alex</h3>
+        </div>
+        <div class="skin-option" data-skin="herobrine">
+          <div class="skin-preview herobrine-preview"></div>
+          <h3>Herobrine</h3>
+        </div>
+        <div class="skin-option" data-skin="muhammad">
+          <div class="skin-preview muhammad-preview"></div>
+          <h3>Muhammad</h3>
+          <p style="font-size: 0.75rem; color: #f1c40f; margin: 0; padding-top: 4px;">Royal Crown & Robes</p>
+        </div>
+      </div>
+      <div class="menu-actions" style="margin-top: 20px;">
+        <button id="btn-skins-close" class="btn btn-primary">Select & Close</button>
       </div>
     </div>
   </div>

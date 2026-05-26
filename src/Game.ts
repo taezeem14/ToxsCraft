@@ -20,6 +20,7 @@ import { getBlock } from './world/BlockRegistry';
 import { createItemStack } from './inventory/ItemStack';
 import { AssetLoader } from './core/AssetLoader';
 import { MobManager } from './mobs/MobManager';
+import { MobEntity, MobType } from './mobs/MobEntity';
 import { settingsManager } from './core/SettingsManager';
 import { AchievementManager } from './core/AchievementManager';
 
@@ -80,6 +81,8 @@ export class Game {
   private portalTimer = 0;
   private autoSaveTimer = 0;
   private totalPlaytime = 0;
+  private chunkUpdateTimer = 0;
+  public cameraMode: 'first' | 'third_back' | 'third_front' = 'first';
 
   // Loop & timing
   private lastTime = 0;
@@ -92,6 +95,7 @@ export class Game {
   private miningProgress = 0;
   private miningTarget: { x: number; y: number; z: number } | null = null;
   private meshQueue: any[] = [];
+  private isLeftClickHeld = false;
 
   // FPS calculation
   private fpsFrameCount = 0;
@@ -125,9 +129,15 @@ export class Game {
 
   private initEventListeners(): void {
     // Input action clicks
-    eventBus.on('click_left', () => this.handleLeftClick());
+    eventBus.on('click_left', () => {
+      this.isLeftClickHeld = true;
+      this.handleLeftClick();
+    });
     eventBus.on('click_right', () => this.handleRightClick());
-    eventBus.on('release_left', () => this.resetMining());
+    eventBus.on('release_left', () => {
+      this.isLeftClickHeld = false;
+      this.resetMining();
+    });
 
     eventBus.on('scroll', (dir: number) => {
       const idx = this.player.inventory.getHotbarSlotIndex();
@@ -138,6 +148,10 @@ export class Game {
     eventBus.on('keydown', (code: string) => {
       if (code === 'Escape' && this.isRunning && !this.player.isDead) {
         this.togglePause();
+      }
+
+      if (code === 'KeyF5' || code === 'F5') {
+        this.toggleCameraMode();
       }
       
       // Hotbar bindings 1-9
@@ -205,9 +219,21 @@ export class Game {
       // First load, generate spawn position
       eventBus.emit('loading_progress', 'Generating spawn column...', 50);
 
-      // A simple loop to find the highest non-air block near 0,0
-      let spawnX = 0;
-      let spawnZ = 0;
+      // Seeded RNG helper for spawn randomization
+      const spawnSeed = world.seed;
+      let h = 2166136261 >>> 0;
+      for (let i = 0; i < spawnSeed.length; i++) {
+        h = Math.imul(h ^ spawnSeed.charCodeAt(i), 16777619) >>> 0;
+      }
+      h = Math.imul(h ^ (h >>> 16), 2246822507) >>> 0;
+      h = Math.imul(h ^ (h >>> 13), 3266489909) >>> 0;
+      h = (h ^ (h >>> 16)) >>> 0;
+      const seedRandomVal1 = h / 4294967296;
+      h = Math.imul(h ^ (h >>> 16), 2246822507) >>> 0;
+      const seedRandomVal2 = h / 4294967296;
+
+      let spawnX = Math.floor(seedRandomVal1 * 300) - 150;
+      let spawnZ = Math.floor(seedRandomVal2 * 300) - 150;
       let spawnY = 255;
       
       // Keep moving generation point until we find a non-ocean column (rough check using block height vs sea level, or just step forward until it's land)
@@ -619,12 +645,22 @@ export class Game {
         this.portalTimer = 0;
       }
 
-      // Async Chunk Loading update around player
-      const updates = this.chunkManager.update(this.player.position.x, this.player.position.z);
-      
-      // Load new meshes (queue them to optimize framerate and eliminate sprinting lag)
-      if (updates.loaded && updates.loaded.length > 0) {
-        this.meshQueue.push(...updates.loaded);
+      // Async Chunk Loading update around player (throttled to 150ms to prevent CPU lag spikes)
+      this.chunkUpdateTimer += deltaSec;
+      if (this.chunkUpdateTimer >= 0.15) {
+        this.chunkUpdateTimer = 0;
+        const updates = this.chunkManager.update(this.player.position.x, this.player.position.z);
+        
+        // Load new meshes (queue them to optimize framerate and eliminate sprinting lag)
+        if (updates.loaded && updates.loaded.length > 0) {
+          this.meshQueue.push(...updates.loaded);
+        }
+
+        // Unload far meshes
+        for (const key of updates.unloaded || []) {
+          const parts = key.split(',');
+          this.renderer.removeChunkMesh(parseInt(parts[0]), parseInt(parts[1]));
+        }
       }
 
       // Process 1 queued chunk mesh per frame to ensure smooth gameplay
@@ -633,13 +669,18 @@ export class Game {
         if (this.chunkManager.isChunkLoaded(chunk.x, chunk.z)) {
           const meshData = GreedyMesher.generateGeometry(chunk, this.chunkManager);
           this.renderer.updateChunkMesh(chunk.x, chunk.z, meshData.solid, meshData.transparent);
-        }
-      }
 
-      // Unload far meshes
-      for (const key of updates.unloaded || []) {
-        const parts = key.split(',');
-        this.renderer.removeChunkMesh(parseInt(parts[0]), parseInt(parts[1]));
+          // Instantiate structural mobs when chunk mesh is first loaded
+          if (chunk.pendingMobSpawns && chunk.pendingMobSpawns.length > 0) {
+            for (const spawn of chunk.pendingMobSpawns) {
+              const id = Math.random().toString(36).substring(2, 9);
+              const spawnPos = new THREE.Vector3(spawn.x, spawn.y, spawn.z);
+              const mob = new MobEntity(id, spawn.type as MobType, spawnPos, this.renderer.scene);
+              this.mobManager.addMob(mob);
+            }
+            chunk.pendingMobSpawns = []; // Clear to prevent double spawning
+          }
+        }
       }
 
       // Check block raycast targets
@@ -669,17 +710,48 @@ export class Game {
       }
     }
 
-    // Sync camera viewport coords to player eyes
+    // Sync camera viewport coords to player eyes based on POV camera mode
     const eyeY = this.player.position.y + this.player.eyeHeight;
-    this.renderer.camera.position.set(this.player.position.x, eyeY, this.player.position.z);
+    const origin = new THREE.Vector3(this.player.position.x, eyeY, this.player.position.z);
 
     // Apply look yaw and pitch angles
-    const lookTarget = new THREE.Vector3(
+    const dir = new THREE.Vector3(
       Math.sin(this.player.yaw) * Math.cos(this.player.pitch),
       Math.sin(this.player.pitch),
       -Math.cos(this.player.yaw) * Math.cos(this.player.pitch)
+    ).normalize();
+
+    if (this.cameraMode === 'first') {
+      this.renderer.camera.position.copy(origin);
+      this.renderer.camera.lookAt(origin.clone().add(dir));
+    } else if (this.cameraMode === 'third_back') {
+      // Raycast to prevent clipping through blocks/walls behind player
+      const backRay = Raycaster.cast(origin, dir.clone().negate(), 3.0, this.chunkManager);
+      const dist = backRay ? Math.max(0.4, backRay.distance - 0.2) : 3.0;
+      const camPos = origin.clone().sub(dir.clone().multiplyScalar(dist));
+      this.renderer.camera.position.copy(camPos);
+      this.renderer.camera.lookAt(origin.clone().add(dir.clone().multiplyScalar(5.0))); // Look slightly ahead of player
+    } else if (this.cameraMode === 'third_front') {
+      // Raycast to prevent clipping through blocks in front of player
+      const frontRay = Raycaster.cast(origin, dir, 3.0, this.chunkManager);
+      const dist = frontRay ? Math.max(0.4, frontRay.distance - 0.2) : 3.0;
+      const camPos = origin.clone().add(dir.clone().multiplyScalar(dist));
+      this.renderer.camera.position.copy(camPos);
+      this.renderer.camera.lookAt(origin); // Look directly at player
+    }
+
+    // Update player model visual mesh in 3D scene (hidden in 1st person)
+    const activeSkin = settingsManager.getValue('skin') || 'steve';
+    this.renderer.updatePlayerModel(
+      this.player.position,
+      this.player.yaw,
+      this.player.pitch,
+      this.player.velocity,
+      activeSkin,
+      this.cameraMode,
+      this.player.isSneaking,
+      now
     );
-    this.renderer.camera.lookAt(this.player.position.clone().setY(eyeY).add(lookTarget));
 
     // Render frame
     this.renderer.render(
@@ -730,7 +802,7 @@ export class Game {
   }
 
   private updateMining(deltaSec: number): void {
-    if (!this.inputManager.isKeyDown('KeyQ') && !this.inputManager.getLocked()) return; // check click down
+    if (!this.isLeftClickHeld) return;
 
     // Ensure we are clicking the same block we started mining
     if (!this.hitResult || !this.miningTarget) {
@@ -852,6 +924,17 @@ export class Game {
     }
     this.player.inventory.consumeSelected();
     AssetLoader.playSound('place', blockIdToPlace);
+  }
+
+  public toggleCameraMode(): void {
+    if (this.cameraMode === 'first') {
+      this.cameraMode = 'third_back';
+    } else if (this.cameraMode === 'third_back') {
+      this.cameraMode = 'third_front';
+    } else {
+      this.cameraMode = 'first';
+    }
+    eventBus.emit('show_toast', `Camera POV: ${this.cameraMode.replace('_', ' ').toUpperCase()}`);
   }
 
   public togglePause(): void {
