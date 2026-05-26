@@ -1,6 +1,17 @@
 import * as THREE from 'three';
 import { Game } from '../Game';
 import { eventBus } from '../EventBus';
+import { 
+  database, 
+  ref, 
+  set, 
+  push, 
+  onChildAdded, 
+  onChildChanged, 
+  onChildRemoved, 
+  remove, 
+  onDisconnect 
+} from './FirebaseManager';
 
 export interface RemotePlayer {
   id: string;
@@ -15,142 +26,181 @@ export interface RemotePlayer {
 
 export class MultiplayerManager {
   private game: Game;
-  private socket: WebSocket | null = null;
   private isConnected = false;
+  private mySessionId: string | null = null;
   private remotePlayers: Map<string, RemotePlayer> = new Map();
   private lastSendTime = 0;
-  private sendInterval = 50; // position syncing tick rate (20 hz)
+  private sendInterval = 100; // syncing position tick rate (100 ms)
+  private unsubscribes: (() => void)[] = [];
 
   constructor(game: Game) {
     this.game = game;
     this.setupLocalEventListeners();
   }
 
-  public connect(url: string, username: string): void {
-    if (this.isConnected || this.socket) {
+  public connect(_url: string, username: string): void {
+    if (this.isConnected) {
       this.disconnect();
     }
 
-    const wsUrl = url.trim() || "wss://toxs-craft-multiplayer.taezeem14.workers.dev/ws";
     this.updateStatus("Connecting...");
 
-    try {
-      this.socket = new WebSocket(wsUrl);
-    } catch (err: any) {
-      this.updateStatus("Error: " + err.message);
-      return;
-    }
+    // Generate unique session ID
+    this.mySessionId = 'player_' + Math.random().toString(36).substring(2, 9);
+    
+    const skinName = (document.querySelector('.skin-option.selected')?.getAttribute('data-skin')) || 'steve';
+    const pos = this.game.player.position;
 
-    this.socket.addEventListener("open", () => {
-      this.isConnected = true;
-      this.updateStatus("Connected");
-      eventBus.emit('show_toast', `Connected to server!`);
+    const presenceRef = ref(database, 'players/' + this.mySessionId);
+    const joinData = {
+      id: this.mySessionId,
+      name: username || "Steve",
+      skin: skinName,
+      x: pos.x,
+      y: pos.y,
+      z: pos.z,
+      yaw: this.game.player.yaw,
+      pitch: this.game.player.pitch,
+      lastUpdate: Date.now()
+    };
 
-      // Retrieve selected skin
-      const skinName = (document.querySelector('.skin-option.selected')?.getAttribute('data-skin')) || 'steve';
-      const pos = this.game.player.position;
-      
-      this.send({
-        type: "join",
-        name: username || "Steve",
-        skin: skinName,
-        x: pos.x,
-        y: pos.y,
-        z: pos.z,
-        yaw: this.game.player.yaw,
-        pitch: this.game.player.pitch
+    set(presenceRef, joinData)
+      .then(() => {
+        this.isConnected = true;
+        this.updateStatus("Connected");
+        eventBus.emit('show_toast', `Connected to lobby!`);
+
+        // Setup presence onDisconnect cleanup
+        onDisconnect(presenceRef).remove();
+
+        // Bind listeners
+        this.bindFirebaseListeners();
+      })
+      .catch((err) => {
+        console.error("Firebase multiplayer join error:", err);
+        this.updateStatus("Offline");
       });
-    });
-
-    this.socket.addEventListener("close", () => {
-      this.cleanup();
-    });
-
-    this.socket.addEventListener("error", (e) => {
-      console.error("Multiplayer socket error:", e);
-      this.updateStatus("Error");
-      this.cleanup();
-    });
-
-    this.socket.addEventListener("message", (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        this.handleMessage(data);
-      } catch (err) {
-        console.error("Failed to parse socket message:", err);
-      }
-    });
   }
 
   public disconnect(): void {
-    if (this.socket) {
-      this.socket.close();
+    if (this.isConnected && this.mySessionId) {
+      const presenceRef = ref(database, 'players/' + this.mySessionId);
+      remove(presenceRef).catch(() => {});
     }
     this.cleanup();
   }
 
   private cleanup(): void {
     this.isConnected = false;
-    this.socket = null;
     
+    // Call all Firebase unsubscribes
+    for (const unsub of this.unsubscribes) {
+      unsub();
+    }
+    this.unsubscribes = [];
+
     // Clear peer meshes from Three scene
     for (const player of this.remotePlayers.values()) {
       this.game.renderer.scene.remove(player.mesh);
     }
     this.remotePlayers.clear();
+    this.mySessionId = null;
     this.updateStatus("Offline");
   }
 
-  private handleMessage(data: any): void {
-    switch (data.type) {
-      case "welcome":
-        break;
+  private bindFirebaseListeners(): void {
+    this.unsubscribes = [];
 
-      case "join":
-        this.spawnRemotePlayer(data);
-        break;
-
-      case "move":
-        const p = this.remotePlayers.get(data.id);
-        if (p) {
-          p.targetPos.set(data.x, data.y, data.z);
-          p.targetYaw = data.yaw;
-          p.targetPitch = data.pitch;
-          p.lastUpdate = performance.now();
+    const playersRef = ref(database, 'players');
+    
+    // 1. Players joining
+    this.unsubscribes.push(
+      onChildAdded(playersRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data && data.id !== this.mySessionId) {
+          this.spawnRemotePlayer(data);
         }
-        break;
+      })
+    );
 
-      case "leave":
-        const lp = this.remotePlayers.get(data.id);
+    // 2. Players moving
+    this.unsubscribes.push(
+      onChildChanged(playersRef, (snapshot) => {
+        const data = snapshot.val();
+        if (data && data.id !== this.mySessionId) {
+          const p = this.remotePlayers.get(snapshot.key!);
+          if (p) {
+            p.targetPos.set(data.x, data.y, data.z);
+            p.targetYaw = data.yaw;
+            p.targetPitch = data.pitch;
+            p.lastUpdate = performance.now();
+          }
+        }
+      })
+    );
+
+    // 3. Players leaving
+    this.unsubscribes.push(
+      onChildRemoved(playersRef, (snapshot) => {
+        const id = snapshot.key!;
+        const lp = this.remotePlayers.get(id);
         if (lp) {
           this.game.renderer.scene.remove(lp.mesh);
-          this.remotePlayers.delete(data.id);
-          eventBus.emit('show_toast', `${lp.name} left the game.`);
+          this.remotePlayers.delete(id);
+          eventBus.emit('show_toast', `${lp.name} left the lobby.`);
         }
-        break;
+      })
+    );
 
-      case "block":
-        const { x, y, z, blockId } = data;
-        this.game.chunkManager.setBlock(x, y, z, blockId);
+    // 4. Block updates syncing
+    const blocksRef = ref(database, 'blocks');
+    
+    const blockHandler = (snapshot: any) => {
+      const key = snapshot.key!;
+      const blockId = snapshot.val();
+      
+      const parts = key.split('_');
+      if (parts.length === 3) {
+        const x = parseInt(parts[0]);
+        const y = parseInt(parts[1]);
+        const z = parseInt(parts[2]);
         
-        // Mark chunk and neighbors dirty
-        const markDirty = (cx: number, cz: number) => {
-          const chunk = this.game.chunkManager.getChunk(cx, cz);
-          if (chunk) chunk.isDirty = true;
-        };
-        const cx = Math.floor(x / 16);
-        const cz = Math.floor(z / 16);
-        markDirty(cx, cz);
-        if ((x % 16) === 0) markDirty(cx - 1, cz);
-        if ((x % 16) === 15) markDirty(cx + 1, cz);
-        if ((z % 16) === 0) markDirty(cx, cz - 1);
-        if ((z % 16) === 15) markDirty(cx, cz + 1);
-        break;
+        const currentBlock = this.game.chunkManager.getBlock(x, y, z);
+        if (currentBlock !== blockId) {
+          this.game.chunkManager.setBlock(x, y, z, blockId);
+          
+          const cx = Math.floor(x / 16);
+          const cz = Math.floor(z / 16);
+          const markDirty = (cx: number, cz: number) => {
+            const chunk = this.game.chunkManager.getChunk(cx, cz);
+            if (chunk) chunk.isDirty = true;
+          };
+          
+          markDirty(cx, cz);
+          if ((x % 16) === 0) markDirty(cx - 1, cz);
+          if ((x % 16) === 15) markDirty(cx + 1, cz);
+          if ((z % 16) === 0) markDirty(cx, cz - 1);
+          if ((z % 16) === 15) markDirty(cx, cz + 1);
+        }
+      }
+    };
 
-      case "chat":
-        eventBus.emit('show_toast', `<${data.name}> ${data.message}`);
-        break;
-    }
+    this.unsubscribes.push(onChildAdded(blocksRef, blockHandler));
+    this.unsubscribes.push(onChildChanged(blocksRef, blockHandler));
+
+    // 5. Chats syncing
+    const chatsRef = ref(database, 'chats');
+    const startTimestamp = Date.now();
+    
+    this.unsubscribes.push(
+      onChildAdded(chatsRef, (snapshot) => {
+        const data = snapshot.val();
+        // Only show chat message if sent after we joined
+        if (data && data.timestamp > startTimestamp) {
+          eventBus.emit('show_toast', `<${data.name}> ${data.message}`);
+        }
+      })
+    );
   }
 
   private spawnRemotePlayer(data: any): void {
@@ -170,38 +220,37 @@ export class MultiplayerManager {
       lastUpdate: performance.now()
     });
 
-    eventBus.emit('show_toast', `${data.name} joined the game.`);
-  }
-
-  private send(packet: any): void {
-    if (this.socket && this.isConnected && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send(JSON.stringify(packet));
-    }
+    eventBus.emit('show_toast', `${data.name} joined the lobby.`);
   }
 
   public update(now: number): void {
-    if (!this.isConnected) return;
+    if (!this.isConnected || !this.mySessionId) return;
 
-    // Send local movements to server
+    // Send local movements to Firebase RTDB periodically
     if (now - this.lastSendTime > this.sendInterval) {
       const pos = this.game.player.position;
-      this.send({
-        type: "move",
+      const presenceRef = ref(database, 'players/' + this.mySessionId);
+      
+      set(presenceRef, {
+        id: this.mySessionId,
+        name: localStorage.getItem("mp_username") || "Steve",
+        skin: (document.querySelector('.skin-option.selected')?.getAttribute('data-skin')) || 'steve',
         x: pos.x,
         y: pos.y,
         z: pos.z,
         yaw: this.game.player.yaw,
-        pitch: this.game.player.pitch
-      });
+        pitch: this.game.player.pitch,
+        lastUpdate: Date.now()
+      }).catch(() => {});
+      
       this.lastSendTime = now;
     }
 
-    // Interpolate remote players positions/rotations and swing limbs
+    // Interpolate remote players coordinates and swing limbs
     for (const player of this.remotePlayers.values()) {
       const lerpFactor = 0.2;
       player.mesh.position.lerp(player.targetPos, lerpFactor);
 
-      // Interpolate horizontal rotation
       player.mesh.rotation.y = player.mesh.rotation.y + (player.targetYaw + Math.PI - player.mesh.rotation.y) * lerpFactor;
       
       const head = player.mesh.getObjectByName('head');
@@ -209,7 +258,6 @@ export class MultiplayerManager {
         head.rotation.x = head.rotation.x + (-player.targetPitch - head.rotation.x) * lerpFactor;
       }
 
-      // Limb swing animations based on distance moved
       const distMoved = player.mesh.position.distanceTo(player.targetPos);
       const isMoving = distMoved > 0.02;
       
@@ -235,34 +283,27 @@ export class MultiplayerManager {
   }
 
   private setupLocalEventListeners(): void {
-    // Listen to local changes to broadcast them
     eventBus.on('block_placed', (data: { x: number; y: number; z: number; blockId: number }) => {
-      this.send({
-        type: "block",
-        x: data.x,
-        y: data.y,
-        z: data.z,
-        blockId: data.blockId
-      });
+      if (!this.isConnected || !this.mySessionId) return;
+      const key = `${data.x}_${data.y}_${data.z}`;
+      set(ref(database, 'blocks/' + key), data.blockId).catch(() => {});
     });
 
     eventBus.on('block_broken', (data: { x: number; y: number; z: number }) => {
-      this.send({
-        type: "block",
-        x: data.x,
-        y: data.y,
-        z: data.z,
-        blockId: 0
-      });
+      if (!this.isConnected || !this.mySessionId) return;
+      const key = `${data.x}_${data.y}_${data.z}`;
+      set(ref(database, 'blocks/' + key), 0).catch(() => {});
     });
   }
 
   public sendChatMessage(message: string): void {
-    if (!message.trim()) return;
-    this.send({
-      type: "chat",
-      message: message
-    });
+    if (!message.trim() || !this.isConnected || !this.mySessionId) return;
+    const chatsRef = ref(database, 'chats');
+    push(chatsRef, {
+      name: localStorage.getItem("mp_username") || "Steve",
+      message: message,
+      timestamp: Date.now()
+    }).catch(() => {});
   }
 
   private updateStatus(status: string): void {

@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Outfit:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/src/ui/styles/main.css">
-  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="src/ui/styles/main.css">
+  <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#e8c96d">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -233,12 +233,11 @@
 
       <!-- Multiplayer Connection Section -->
       <div class="multiplayer-pause-box">
-        <h3>Multiplayer</h3>
+        <h3>Multiplayer Lobby</h3>
         <div class="form-group-row">
-          <input type="text" id="input-mp-server" placeholder="ws://localhost:8787" value="">
           <input type="text" id="input-mp-username" placeholder="Username" value="Steve">
         </div>
-        <button id="btn-mp-connect" class="btn btn-secondary">Connect</button>
+        <button id="btn-mp-connect" class="btn btn-secondary">Connect to Lobby</button>
         <div id="mp-status-msg" class="mp-status">Offline</div>
       </div>
     </div>
@@ -429,6 +428,6 @@
   <!-- Cursor Held Item Tracking -->
   <div id="cursor-item" class="item-icon-held hidden"></div>
 
-  <script type="module" src="/src/main.ts"></script>
+  <script type="module" src="src/main.ts"></script>
 </body>
 </html>
