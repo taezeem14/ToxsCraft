@@ -10,7 +10,7 @@ import { WorldDatabase, WorldMetadata } from '../save/WorldDatabase';
 import { ItemStack, createItemStack } from '../inventory/ItemStack';
 import { AssetLoader } from '../core/AssetLoader';
 import { AchievementManager } from '../core/AchievementManager';
-import { auth, signInWithGoogle, signOutUser, onAuthStateChanged } from '../core/FirebaseManager';
+import { auth, database, signInWithGoogle, signOutUser, onAuthStateChanged, ref, onValue } from '../core/FirebaseManager';
 
 export class UIManager {
   private game: Game;
@@ -196,24 +196,18 @@ export class UIManager {
     const statusEl = document.getElementById('landing-lobby-status');
     if (!statusEl) return;
 
-    const lobbyUrl = "wss://toxs-craft-multiplayer.taezeem14.workers.dev/ws";
-    
     try {
-      const socket = new WebSocket(lobbyUrl);
-      socket.addEventListener('open', () => {
-        statusEl.textContent = "Online";
-        statusEl.className = "lobby-badge status-online";
-        socket.close();
+      const connectedRef = ref(database, '.info/connected');
+      onValue(connectedRef, (snap) => {
+        if (snap.val() === true) {
+          statusEl.textContent = "Online";
+          statusEl.className = "lobby-badge status-online";
+        } else {
+          statusEl.textContent = "Offline";
+          statusEl.className = "lobby-badge status-offline";
+        }
       });
-      const failHandler = () => {
-        statusEl.textContent = "Offline";
-        statusEl.className = "lobby-badge status-offline";
-      };
-      socket.addEventListener('error', failHandler);
-      socket.addEventListener('close', (e) => {
-        if (!e.wasClean) failHandler();
-      });
-    } catch {
+    } catch (err) {
       statusEl.textContent = "Offline";
       statusEl.className = "lobby-badge status-offline";
     }
