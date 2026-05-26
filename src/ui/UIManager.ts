@@ -3,7 +3,7 @@
  * Controls all DOM overlays, HUD metrics, menu states, click-to-move inventory, and 2x2 crafting.
  */
 
-import { Game } from '../Game';
+import { Game, BLOCK_PLACEMENT_MAP } from '../Game';
 import { eventBus } from '../EventBus';
 import { settingsManager } from '../core/SettingsManager';
 import { WorldDatabase, WorldMetadata } from '../save/WorldDatabase';
@@ -11,6 +11,7 @@ import { ItemStack, createItemStack } from '../inventory/ItemStack';
 import { AssetLoader } from '../core/AssetLoader';
 import { AchievementManager } from '../core/AchievementManager';
 import { auth, database, signInWithGoogle, signOutUser, onAuthStateChanged, ref, onValue } from '../core/FirebaseManager';
+import { BLOCKS } from '../world/BlockRegistry';
 
 export class UIManager {
   private game: Game;
@@ -43,6 +44,7 @@ export class UIManager {
   // 2x2 Crafting inputs (indices 0-3) and output slot
   private craftInput: (ItemStack | null)[] = [null, null, null, null];
   private craftOutput: ItemStack | null = null;
+  private itemTextureCache: Map<string, string> = new Map();
 
   constructor(game: Game) {
     this.game = game;
@@ -670,6 +672,19 @@ export class UIManager {
       // Time string
       document.getElementById('time-val')!.textContent = this.game.dayNightCycle.getTimeString();
     }, 100);
+
+    // Bind click/touch events to HUD hotbar slots
+    const hudSlots = document.querySelectorAll('#hotbar .hotbar-slot');
+    hudSlots.forEach((slot, idx) => {
+      const selectFn = (e: Event) => {
+        e.stopPropagation();
+        if (this.game.player) {
+          this.game.player.inventory.setHotbarSlotIndex(idx);
+        }
+      };
+      slot.addEventListener('click', selectFn);
+      slot.addEventListener('touchstart', selectFn);
+    });
   }
 
   private drawHUDVitals(): void {
@@ -743,10 +758,12 @@ export class UIManager {
     const itemDiv = document.createElement('div');
     itemDiv.className = 'item-slot';
 
-    // Procedural color mapping representing item icon
+    // Procedural texture mapping representing item icon
     const icon = document.createElement('div');
     icon.className = 'item-texture';
-    icon.style.backgroundColor = this.getItemColor(stack.id);
+    icon.style.backgroundImage = `url(${this.getItemTexture(stack.id)})`;
+    icon.style.backgroundSize = '100% 100%';
+    icon.style.imageRendering = 'pixelated';
     icon.style.border = '2px solid rgba(0,0,0,0.2)';
     icon.style.borderRadius = '4px';
 
@@ -798,6 +815,241 @@ export class UIManager {
     if (itemId === 'emerald') return '#2ecc71';
     if (itemId === 'lapis_lazuli') return '#2980b9';
     return '#bdc3c7'; // default light gray
+  }
+
+  private getItemTexture(itemId: string): string {
+    if (this.itemTextureCache.has(itemId)) {
+      return this.itemTextureCache.get(itemId)!;
+    }
+
+    const tileSize = 16;
+    const canvas = document.createElement('canvas');
+    canvas.width = tileSize;
+    canvas.height = tileSize;
+    const ctx = canvas.getContext('2d')!;
+    ctx.imageSmoothingEnabled = false;
+    (ctx as any).mozImageSmoothingEnabled = false;
+    (ctx as any).webkitImageSmoothingEnabled = false;
+    (ctx as any).msImageSmoothingEnabled = false;
+
+    // Helper to draw pixel
+    const p = (x: number, y: number, color: string) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, 1, 1);
+    };
+
+    // Helper to fill rectangle
+    const r = (x: number, y: number, w: number, h: number, color: string) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(x, y, w, h);
+    };
+
+    // Check if it's a block
+    const blockId = BLOCK_PLACEMENT_MAP[itemId];
+    if (blockId !== undefined) {
+      // It's a block, extract from texture atlas!
+      try {
+        const atlas = AssetLoader.getTextureAtlas().image as HTMLCanvasElement;
+        const bDef = BLOCKS[blockId];
+        // Use top texture for grass block or chest/furnace top, otherwise side/top
+        let texIdx = bDef.textures.side;
+        if (itemId === 'grass_block' || itemId === 'crafting_table' || itemId === 'furnace' || itemId === 'chest') {
+          texIdx = bDef.textures.top;
+        }
+        
+        const col = texIdx % 16;
+        const row = Math.floor(texIdx / 16);
+        ctx.drawImage(atlas, col * tileSize, row * tileSize, tileSize, tileSize, 0, 0, tileSize, tileSize);
+        
+        const dataUrl = canvas.toDataURL();
+        this.itemTextureCache.set(itemId, dataUrl);
+        return dataUrl;
+      } catch (err) {
+        console.warn("Failed to extract block texture:", err);
+      }
+    }
+
+    // It's a non-block item or tool
+    // Clear canvas transparent
+    ctx.clearRect(0, 0, 16, 16);
+
+    // Resolve color base for tools
+    let toolColor = '#fff';
+    let handleColor = '#85633e'; // Wood stick
+    if (itemId.startsWith('wood_')) toolColor = '#9c7c5d';
+    else if (itemId.startsWith('stone_')) toolColor = '#808080';
+    else if (itemId.startsWith('iron_')) toolColor = '#dcdde1';
+    else if (itemId.startsWith('gold_')) toolColor = '#fbc531';
+    else if (itemId.startsWith('diamond_')) toolColor = '#00a8ff';
+
+    if (itemId.includes('pickaxe')) {
+      // Diagonal handle
+      for (let i = 2; i <= 12; i++) {
+        p(i, 14 - i, handleColor);
+      }
+      // Pickaxe head
+      r(9, 2, 4, 2, toolColor);
+      r(11, 4, 2, 2, toolColor);
+      r(13, 6, 2, 2, toolColor);
+      r(7, 0, 4, 2, toolColor);
+      r(5, 2, 2, 2, toolColor);
+      r(3, 4, 2, 2, toolColor);
+      // Dark tips / highlights
+      p(2, 5, '#2f3640');
+      p(14, 7, '#2f3640');
+    } 
+    else if (itemId.includes('sword')) {
+      // Diagonal handle
+      p(1, 14, '#2f3640');
+      p(2, 13, handleColor);
+      p(3, 12, handleColor);
+      // Guard
+      p(2, 11, '#718093');
+      p(3, 11, '#718093');
+      p(4, 11, '#718093');
+      p(4, 12, '#718093');
+      p(4, 13, '#718093');
+      // Blade
+      for (let i = 4; i <= 12; i++) {
+        p(i, 15 - i, toolColor);
+        p(i + 1, 14 - i, toolColor);
+      }
+      p(13, 2, '#fff'); // tip shine
+    } 
+    else if (itemId.includes('axe') && !itemId.includes('pickaxe')) {
+      // Diagonal handle
+      for (let i = 2; i <= 13; i++) {
+        p(i, 15 - i, handleColor);
+      }
+      // Axe head
+      r(10, 1, 4, 4, toolColor);
+      r(9, 2, 2, 4, toolColor);
+      r(8, 3, 2, 2, toolColor);
+    } 
+    else if (itemId.includes('shovel')) {
+      // Diagonal handle
+      for (let i = 2; i <= 12; i++) {
+        p(i, 15 - i, handleColor);
+      }
+      // Shovel head
+      r(11, 2, 3, 3, toolColor);
+      p(10, 4, toolColor);
+      p(12, 1, toolColor);
+    } 
+    else if (itemId === 'apple') {
+      // Apple shape
+      r(5, 4, 6, 8, '#e74c3c');
+      r(4, 5, 8, 6, '#e74c3c');
+      p(6, 3, '#27ae60'); // leaf
+      p(7, 3, '#85633e'); // stem
+      p(5, 5, '#ff8080'); // shine
+    } 
+    else if (itemId === 'bread') {
+      r(3, 5, 10, 6, '#f3a663');
+      r(4, 4, 8, 8, '#d35400');
+      // Lines
+      p(5, 5, '#e67e22');
+      p(8, 5, '#e67e22');
+      p(11, 5, '#e67e22');
+    } 
+    else if (itemId === 'cooked_beef') {
+      r(4, 4, 8, 7, '#a04000');
+      r(3, 5, 10, 5, '#78281f');
+      p(6, 6, '#e74c3c');
+      p(8, 7, '#e74c3c');
+    } 
+    else if (itemId === 'cooked_porkchop') {
+      r(3, 5, 8, 6, '#e59866');
+      r(4, 4, 6, 8, '#ba4a00');
+      p(11, 10, '#fdfefe'); // bone
+      p(12, 11, '#fdfefe');
+    } 
+    else if (itemId === 'diamond') {
+      r(6, 4, 4, 8, '#33ffff');
+      r(4, 6, 8, 4, '#33ffff');
+      p(5, 5, '#ffffff'); // shine
+      p(10, 10, '#2980b9');
+    } 
+    else if (itemId === 'coal') {
+      r(5, 5, 6, 6, '#2c3e50');
+      p(4, 6, '#1a252f');
+      p(11, 9, '#1a252f');
+    } 
+    else if (itemId === 'raw_iron') {
+      r(5, 5, 6, 6, '#d98880');
+      p(4, 7, '#f5b041');
+    } 
+    else if (itemId === 'raw_gold') {
+      r(5, 5, 6, 6, '#f1c40f');
+      p(4, 7, '#f39c12');
+    } 
+    else if (itemId === 'redstone_dust') {
+      p(5, 6, '#c0392b');
+      p(8, 5, '#e74c3c');
+      p(6, 9, '#c0392b');
+      p(9, 8, '#e74c3c');
+    } 
+    else if (itemId === 'emerald') {
+      r(6, 4, 4, 8, '#2ecc71');
+      r(4, 6, 8, 4, '#27ae60');
+      p(6, 6, '#fff');
+    } 
+    else if (itemId === 'lapis_lazuli') {
+      r(5, 5, 6, 6, '#2980b9');
+      p(4, 6, '#1f3a52');
+    } 
+    else if (itemId === 'stick') {
+      for (let i = 2; i <= 13; i++) {
+        p(i, 15 - i, '#85633e');
+      }
+    } 
+    else if (itemId === 'flint_and_steel') {
+      // Steel
+      r(4, 6, 3, 5, '#bdc3c7');
+      p(3, 8, '#7f8c8d');
+      // Flint
+      r(8, 8, 4, 3, '#34495e');
+    } 
+    else {
+      // Fallback: Fill slot with solid color
+      ctx.fillStyle = this.getItemColor(itemId);
+      ctx.fillRect(2, 2, 12, 12);
+    }
+
+    const dataUrl = canvas.toDataURL();
+    this.itemTextureCache.set(itemId, dataUrl);
+    return dataUrl;
+  }
+
+  private updateCursorElement(): void {
+    if (this.heldItem) {
+      this.cursorElement.classList.remove('hidden');
+      this.cursorElement.style.backgroundImage = `url(${this.getItemTexture(this.heldItem.id)})`;
+      this.cursorElement.style.backgroundSize = '100% 100%';
+      this.cursorElement.style.imageRendering = 'pixelated';
+      this.cursorElement.style.border = '2px solid #fff';
+      this.cursorElement.style.width = '32px';
+      this.cursorElement.style.height = '32px';
+      this.cursorElement.style.pointerEvents = 'none';
+      
+      this.cursorElement.innerHTML = '';
+      if (this.heldItem.count > 1) {
+        const countLabel = document.createElement('div');
+        countLabel.className = 'item-count';
+        countLabel.style.position = 'absolute';
+        countLabel.style.bottom = '2px';
+        countLabel.style.right = '2px';
+        countLabel.style.fontSize = '12px';
+        countLabel.style.color = '#fff';
+        countLabel.style.textShadow = '1px 1px 2px #000';
+        countLabel.style.fontFamily = 'monospace';
+        countLabel.textContent = this.heldItem.count.toString();
+        this.cursorElement.appendChild(countLabel);
+      }
+    } else {
+      this.cursorElement.classList.add('hidden');
+      this.cursorElement.innerHTML = '';
+    }
   }
 
   /**
@@ -881,7 +1133,7 @@ export class UIManager {
     if (this.heldItem) {
       this.game.player.inventory.addItem(this.heldItem);
       this.heldItem = null;
-      this.cursorElement.classList.add('hidden');
+      this.updateCursorElement();
     }
   }
 
@@ -1009,16 +1261,12 @@ export class UIManager {
       if (current) {
         this.heldItem = current;
         inv.setItem(idx, null);
-        this.cursorElement.classList.remove('hidden');
-        this.cursorElement.style.backgroundColor = this.getItemColor(this.heldItem.id);
-        this.cursorElement.style.border = '2px solid #fff';
       }
     } else {
       // Place / swap held item
       if (!current) {
         inv.setItem(idx, this.heldItem);
         this.heldItem = null;
-        this.cursorElement.classList.add('hidden');
       } else if (current.id === this.heldItem.id) {
         // Merge stacks
         const max = current.maxStack || 64;
@@ -1027,7 +1275,6 @@ export class UIManager {
         this.heldItem.count -= addAmount;
         if (this.heldItem.count <= 0) {
           this.heldItem = null;
-          this.cursorElement.classList.add('hidden');
         }
         inv.setItem(idx, current);
       } else {
@@ -1035,9 +1282,9 @@ export class UIManager {
         const temp = current;
         inv.setItem(idx, this.heldItem);
         this.heldItem = temp;
-        this.cursorElement.style.backgroundColor = this.getItemColor(this.heldItem.id);
       }
     }
+    this.updateCursorElement();
     this.drawInventorySlots();
   }
 
@@ -1048,25 +1295,21 @@ export class UIManager {
       if (current) {
         this.heldItem = current;
         this.craftInput[cIdx] = null;
-        this.cursorElement.classList.remove('hidden');
-        this.cursorElement.style.backgroundColor = this.getItemColor(this.heldItem.id);
       }
     } else {
       if (!current) {
         this.craftInput[cIdx] = this.heldItem;
         this.heldItem = null;
-        this.cursorElement.classList.add('hidden');
       } else if (current.id === this.heldItem.id) {
         current.count += this.heldItem.count; // simplicity merge
         this.heldItem = null;
-        this.cursorElement.classList.add('hidden');
       } else {
         const temp = current;
         this.craftInput[cIdx] = this.heldItem;
         this.heldItem = temp;
-        this.cursorElement.style.backgroundColor = this.getItemColor(this.heldItem.id);
       }
     }
+    this.updateCursorElement();
     this.resolveCrafting();
     this.drawInventorySlots();
   }
@@ -1076,8 +1319,6 @@ export class UIManager {
       // Pick up craft result
       this.heldItem = this.craftOutput;
       this.craftOutput = null;
-      this.cursorElement.classList.remove('hidden');
-      this.cursorElement.style.backgroundColor = this.getItemColor(this.heldItem.id);
 
       // Consume inputs
       for (let i = 0; i < 4; i++) {
@@ -1089,6 +1330,7 @@ export class UIManager {
         }
       }
 
+      this.updateCursorElement();
       this.resolveCrafting();
       this.drawInventorySlots();
     }

@@ -26,7 +26,7 @@ import { AchievementManager } from './core/AchievementManager';
 import { MultiplayerManager } from './core/MultiplayerManager';
 
 // Helper mapping inventory item IDs to block placement IDs
-const BLOCK_PLACEMENT_MAP: { [key: string]: number } = {
+export const BLOCK_PLACEMENT_MAP: { [key: string]: number } = {
   "stone": 1,
   "dirt": 2,
   "grass_block": 3,
