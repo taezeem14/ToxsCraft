@@ -78,6 +78,17 @@ export class UIManager {
         this.cursorElement.style.top = `${e.clientY + 10}px`;
       }
     });
+
+    // Orientation check for mobile landscape lock
+    this.checkOrientation();
+    window.addEventListener('resize', () => this.checkOrientation());
+    window.addEventListener('orientationchange', () => this.checkOrientation());
+
+    // Listen to Fullscreen change to update buttons
+    const fsEvents = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange'];
+    fsEvents.forEach(evt => {
+      document.addEventListener(evt, () => this.updateFullscreenButtons());
+    });
   }
 
   private showScreen(screenKey: string): void {
@@ -125,6 +136,59 @@ export class UIManager {
       if (mpUserEl) {
         mpUserEl.value = 'Steve';
       }
+    }
+  }
+
+  private checkOrientation(): void {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      || (window.innerWidth <= 1024 && 'ontouchstart' in window);
+    
+    const overlay = document.getElementById('orientation-overlay');
+    if (!overlay) return;
+
+    if (isMobile && window.innerHeight > window.innerWidth) {
+      overlay.classList.remove('hidden');
+      if (document.pointerLockElement) {
+        document.exitPointerLock();
+      }
+    } else {
+      overlay.classList.add('hidden');
+    }
+  }
+
+  private toggleFullscreen(): void {
+    const doc = window.document;
+    const docEl = doc.documentElement;
+
+    const requestFullScreen = docEl.requestFullscreen || (docEl as any).mozRequestFullScreen || (docEl as any).webkitRequestFullScreen || (docEl as any).msRequestFullscreen;
+    const cancelFullScreen = doc.exitFullscreen || (doc as any).mozCancelFullScreen || (doc as any).webkitExitFullscreen || (doc as any).msExitFullscreen;
+
+    const isFs = !!(doc.fullscreenElement || (doc as any).mozFullScreenElement || (doc as any).webkitFullscreenElement || (doc as any).msFullscreenElement);
+
+    if (!isFs) {
+      if (requestFullScreen) {
+        requestFullScreen.call(docEl).catch((err: any) => {
+          console.warn(`Error enabling full-screen mode: ${err.message}`);
+        });
+      }
+    } else {
+      if (cancelFullScreen) {
+        cancelFullScreen.call(doc);
+      }
+    }
+  }
+
+  private updateFullscreenButtons(): void {
+    const doc = window.document;
+    const isFs = !!(doc.fullscreenElement || (doc as any).mozFullScreenElement || (doc as any).webkitFullScreenElement || (doc as any).msFullscreenElement);
+    
+    const btnHudFs = document.getElementById('btn-hud-fullscreen');
+    if (btnHudFs) {
+      btnHudFs.title = isFs ? 'Exit Fullscreen' : 'Enter Fullscreen';
+    }
+    const btnPauseFs = document.getElementById('btn-pause-fullscreen');
+    if (btnPauseFs) {
+      btnPauseFs.textContent = isFs ? 'Exit Fullscreen' : 'Toggle Fullscreen';
     }
   }
 
@@ -272,6 +336,20 @@ export class UIManager {
     if (btnPause) {
       btnPause.addEventListener('click', () => {
         this.game.togglePause();
+      });
+    }
+
+    const btnHudFs = document.getElementById('btn-hud-fullscreen');
+    if (btnHudFs) {
+      btnHudFs.addEventListener('click', () => {
+        this.toggleFullscreen();
+      });
+    }
+
+    const btnPauseFs = document.getElementById('btn-pause-fullscreen');
+    if (btnPauseFs) {
+      btnPauseFs.addEventListener('click', () => {
+        this.toggleFullscreen();
       });
     }
 

@@ -26,6 +26,7 @@
     <!-- Top-Center Utility Bar -->
     <div id="hud-top-center" class="hud-top-center">
       <button id="btn-hud-chat" class="hud-top-btn" title="Chat">💬</button>
+      <button id="btn-hud-fullscreen" class="hud-top-btn" title="Toggle Fullscreen">📺</button>
       <button id="btn-hud-pause" class="hud-top-btn" title="Pause Game">⏸</button>
     </div>
 
@@ -228,6 +229,7 @@
         <button id="btn-unstuck" class="btn">Unstuck (Surface TP)</button>
         <button id="btn-achievements" class="btn">Achievements</button>
         <button id="btn-settings-pause" class="btn">Settings</button>
+        <button id="btn-pause-fullscreen" class="btn">Toggle Fullscreen</button>
         <button id="btn-quit" class="btn">Save & Quit</button>
       </div>
 
@@ -427,6 +429,15 @@
 
   <!-- Cursor Held Item Tracking -->
   <div id="cursor-item" class="item-icon-held hidden"></div>
+
+  <!-- Orientation Block Screen for Portrait Mode -->
+  <div id="orientation-overlay" class="ui-screen hidden">
+    <div class="orientation-card text-center">
+      <div class="phone-rotate-icon">📱🔄</div>
+      <h2>Rotate Your Device</h2>
+      <p>Tox'sCraft is designed to be played in landscape (horizontal) mode only. Please rotate your device to continue.</p>
+    </div>
+  </div>
 
   <script type="module" src="src/main.ts"></script>
 </body>
