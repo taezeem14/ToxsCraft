@@ -103,8 +103,67 @@
     </div>
   </div>
 
+  <!-- Premium Landing Page Overlay -->
+  <div id="landing-page" class="ui-screen landing-container">
+    <!-- Hero Banner -->
+    <div class="landing-hero">
+      <div class="landing-stars"></div>
+      <h1 class="landing-logo animate-glow">TOX'SCRAFT</h1>
+      <p class="landing-tagline">Experience the ultimate WebGL voxel sandbox universe.</p>
+      
+      <!-- Auth Panel -->
+      <div id="auth-panel" class="auth-panel">
+        <div id="auth-logged-out" class="auth-group">
+          <p>Login with your Google Account to unlock multiplayer, save custom skins, and track achievements.</p>
+          <button id="btn-google-login" class="btn btn-google">
+            <span class="g-icon">G</span> Sign In with Google
+          </button>
+        </div>
+        
+        <div id="auth-logged-in" class="auth-group hidden">
+          <div class="user-profile-badge">
+            <img id="user-avatar" src="" alt="Avatar" class="avatar-img">
+            <div class="user-info">
+              <span id="user-display-name" class="user-name">Guest</span>
+              <span class="user-status">authenticated</span>
+            </div>
+          </div>
+          <button id="btn-google-logout" class="btn btn-danger-outline">Sign Out</button>
+        </div>
+      </div>
+
+      <div class="landing-actions">
+        <button id="btn-enter-game" class="btn btn-primary btn-large">Launch Game</button>
+      </div>
+    </div>
+
+    <!-- Features Section -->
+    <div class="landing-features">
+      <div class="feature-card">
+        <div class="feature-icon">🌍</div>
+        <h3>Procedural Worlds</h3>
+        <p>Infinite terrain, deep caverns, custom seeds, and immersive day/night cycles.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>WebGL Engine</h3>
+        <p>High performance voxel rendering, lighting maps, dynamic shadows, and 3D audio.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">👥</div>
+        <h3>Multiplayer Rooms</h3>
+        <p>Real-time block syncing, chat rooms, and customizable skins via WebSockets.</p>
+      </div>
+    </div>
+
+    <div class="landing-footer">
+      <div>Developed by Muhammad Taezeem Tariq Matta</div>
+      <div class="footer-lobby">Default Lobby: <span id="landing-lobby-status" class="lobby-badge status-offline">Offline</span></div>
+    </div>
+  </div>
+
   <!-- Main Menu Overlay -->
-  <div id="main-menu" class="ui-screen menu-container">
+  <div id="main-menu" class="ui-screen menu-container hidden">
     <div class="menu-card text-center">
       <h1 class="game-logo animate-glow">TOX'SCRAFT</h1>
       <div class="splash-text">Procedural voxel engine!</div>

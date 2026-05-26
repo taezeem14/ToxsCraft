@@ -10,6 +10,7 @@ import { WorldDatabase, WorldMetadata } from '../save/WorldDatabase';
 import { ItemStack, createItemStack } from '../inventory/ItemStack';
 import { AssetLoader } from '../core/AssetLoader';
 import { AchievementManager } from '../core/AchievementManager';
+import { auth, signInWithGoogle, signOutUser, onAuthStateChanged } from '../core/FirebaseManager';
 
 export class UIManager {
   private game: Game;
@@ -21,6 +22,7 @@ export class UIManager {
 
   // Screen Containers
   private screens: { [key: string]: HTMLElement } = {
+    landingPage: document.getElementById('landing-page')!,
     mainMenu: document.getElementById('main-menu')!,
     worldSelect: document.getElementById('world-select')!,
     worldCreate: document.getElementById('world-create')!,
@@ -44,7 +46,7 @@ export class UIManager {
 
   constructor(game: Game) {
     this.game = game;
-    this.activeScreen = this.screens.mainMenu;
+    this.activeScreen = this.screens.landingPage;
 
     this.bindButtons();
     this.bindSettings();
@@ -55,11 +57,19 @@ export class UIManager {
     const urlEl = document.getElementById('input-mp-server') as HTMLInputElement;
     const userEl = document.getElementById('input-mp-username') as HTMLInputElement;
     if (urlEl) {
-      urlEl.value = localStorage.getItem("mp_server_url") || "";
+      urlEl.value = localStorage.getItem("mp_server_url") || "wss://toxs-craft-multiplayer.taezeem14.workers.dev/ws";
     }
     if (userEl) {
       userEl.value = localStorage.getItem("mp_username") || "Steve";
     }
+
+    // Google Auth State observer
+    onAuthStateChanged(auth, (user) => {
+      this.handleAuthStateChange(user);
+    });
+
+    // Ping default lobby status
+    this.pingDefaultLobby();
 
     // Mouse tracking for cursor held item
     document.addEventListener('mousemove', (e) => {
@@ -86,6 +96,62 @@ export class UIManager {
     if (this.activeScreen) {
       this.activeScreen.classList.add('hidden');
       this.activeScreen = null;
+    }
+  }
+
+  private handleAuthStateChange(user: any): void {
+    const loggedOutEl = document.getElementById('auth-logged-out');
+    const loggedInEl = document.getElementById('auth-logged-in');
+    const avatarEl = document.getElementById('user-avatar') as HTMLImageElement;
+    const nameEl = document.getElementById('user-display-name');
+
+    if (user) {
+      if (loggedOutEl) loggedOutEl.classList.add('hidden');
+      if (loggedInEl) loggedInEl.classList.remove('hidden');
+      if (avatarEl) avatarEl.src = user.photoURL || 'https://www.gravatar.com/avatar/?d=mp';
+      if (nameEl) nameEl.textContent = user.displayName || 'Player';
+      
+      localStorage.setItem('mp_username', user.displayName || 'Player');
+      const mpUserEl = document.getElementById('input-mp-username') as HTMLInputElement;
+      if (mpUserEl) {
+        mpUserEl.value = user.displayName || 'Player';
+      }
+    } else {
+      if (loggedOutEl) loggedOutEl.classList.remove('hidden');
+      if (loggedInEl) loggedInEl.classList.add('hidden');
+      
+      localStorage.setItem('mp_username', 'Steve');
+      const mpUserEl = document.getElementById('input-mp-username') as HTMLInputElement;
+      if (mpUserEl) {
+        mpUserEl.value = 'Steve';
+      }
+    }
+  }
+
+  private pingDefaultLobby(): void {
+    const statusEl = document.getElementById('landing-lobby-status');
+    if (!statusEl) return;
+
+    const lobbyUrl = "wss://toxs-craft-multiplayer.taezeem14.workers.dev/ws";
+    
+    try {
+      const socket = new WebSocket(lobbyUrl);
+      socket.addEventListener('open', () => {
+        statusEl.textContent = "Online";
+        statusEl.className = "lobby-badge status-online";
+        socket.close();
+      });
+      const failHandler = () => {
+        statusEl.textContent = "Offline";
+        statusEl.className = "lobby-badge status-offline";
+      };
+      socket.addEventListener('error', failHandler);
+      socket.addEventListener('close', (e) => {
+        if (!e.wasClean) failHandler();
+      });
+    } catch {
+      statusEl.textContent = "Offline";
+      statusEl.className = "lobby-badge status-offline";
     }
   }
 
@@ -235,7 +301,7 @@ export class UIManager {
         } else {
           const urlEl = document.getElementById('input-mp-server') as HTMLInputElement;
           const userEl = document.getElementById('input-mp-username') as HTMLInputElement;
-          const url = urlEl.value || "ws://localhost:8787/ws";
+          const url = urlEl.value || "wss://toxs-craft-multiplayer.taezeem14.workers.dev/ws";
           const username = userEl.value || "Steve";
           
           localStorage.setItem("mp_server_url", url);
@@ -243,6 +309,39 @@ export class UIManager {
 
           this.game.multiplayerManager.connect(url, username);
         }
+      });
+    }
+
+    // Google Auth & Landing Page Actions
+    const btnGoogleLogin = document.getElementById('btn-google-login');
+    if (btnGoogleLogin) {
+      btnGoogleLogin.addEventListener('click', async () => {
+        try {
+          await signInWithGoogle();
+          this.showToast("Signed in with Google!");
+        } catch (err: any) {
+          console.error(err);
+          this.showToast("Google Auth error: " + err.message);
+        }
+      });
+    }
+
+    const btnGoogleLogout = document.getElementById('btn-google-logout');
+    if (btnGoogleLogout) {
+      btnGoogleLogout.addEventListener('click', async () => {
+        try {
+          await signOutUser();
+          this.showToast("Signed out.");
+        } catch (err: any) {
+          console.error(err);
+        }
+      });
+    }
+
+    const btnEnterGame = document.getElementById('btn-enter-game');
+    if (btnEnterGame) {
+      btnEnterGame.addEventListener('click', () => {
+        this.showScreen('mainMenu');
       });
     }
 

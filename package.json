@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "firebase": "^12.13.0",
     "howler": "^2.2.4",
     "idb": "^8.0.1",
     "simplex-noise": "^4.0.1",

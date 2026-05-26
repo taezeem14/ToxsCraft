@@ -31,7 +31,7 @@ export class MultiplayerManager {
       this.disconnect();
     }
 
-    const wsUrl = url.trim() || "ws://localhost:8787/ws";
+    const wsUrl = url.trim() || "wss://toxs-craft-multiplayer.taezeem14.workers.dev/ws";
     this.updateStatus("Connecting...");
 
     try {
