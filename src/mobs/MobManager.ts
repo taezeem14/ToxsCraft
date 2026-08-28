@@ -9,6 +9,7 @@ import { ArrowEntity } from './ArrowEntity';
 import { Player } from '../player/Player';
 import { ChunkManager } from '../world/ChunkManager';
 import { settingsManager } from '../core/SettingsManager';
+import { AssetLoader } from '../core/AssetLoader';
 
 export class MobManager {
   private scene: THREE.Scene;
@@ -127,7 +128,11 @@ export class MobManager {
    * Raycast attack check against active mob bounding boxes.
    * Resolves first hit within maxRange, dealing damage and playing effects.
    */
-  public checkAttack(origin: THREE.Vector3, dir: THREE.Vector3, maxRange: number, player: Player): boolean {
+  /**
+   * Raycast attack check against active mob bounding boxes.
+   * Resolves first hit within maxRange, dealing damage, critical effects, and knockback.
+   */
+  public checkAttack(origin: THREE.Vector3, dir: THREE.Vector3, maxRange: number, player: Player, particleSystem?: any): boolean {
     let closestMob: MobEntity | null = null;
     let closestDist = maxRange;
 
@@ -155,9 +160,16 @@ export class MobManager {
       // Resolve melee damage based on active held tool
       const held = player.inventory.getSelected();
       let damage = 2.0; // default fist damage
+      let isSword = false;
       
       if (held) {
         if (held.id.includes('sword')) {
+          isSword = true;
+          if (held.id.startsWith('wood_')) damage = 4.5;
+          else if (held.id.startsWith('stone_')) damage = 6.0;
+          else if (held.id.startsWith('iron_')) damage = 8.0;
+          else if (held.id.startsWith('diamond_')) damage = 11.0;
+        } else if (held.id.includes('axe')) {
           if (held.id.startsWith('wood_')) damage = 4.0;
           else if (held.id.startsWith('stone_')) damage = 5.0;
           else if (held.id.startsWith('iron_')) damage = 7.0;
@@ -165,9 +177,36 @@ export class MobManager {
         } else if (held.id.includes('pickaxe')) {
           damage = 3.5;
         }
+
+        // Damage tool durability
+        if (held.durability !== undefined && held.durability > 0) {
+          held.durability--;
+          if (held.durability <= 0) {
+            player.inventory.consumeSelected();
+            AssetLoader.playSound('item_break');
+          }
+        }
       }
 
-      closestMob.takeDamage(damage, this, this.scene);
+      // Critical Hit Detection (jumping / falling down)
+      const isCrit = (!player.onGround && player.velocity.y < -0.1);
+      if (isCrit) {
+        damage *= 1.5;
+        AssetLoader.playSound('crit');
+      } else if (isSword) {
+        AssetLoader.playSound('sword_sweep');
+      }
+
+      // Spawn hit particles
+      if (particleSystem) {
+        particleSystem.spawnHitSparks(
+          closestMob.position.clone().add(new THREE.Vector3(0, closestMob.height * 0.5, 0)),
+          isCrit,
+          isCrit ? 16 : 10
+        );
+      }
+
+      closestMob.takeDamage(damage, this, this.scene, player.position, player, particleSystem);
       return true;
     }
 

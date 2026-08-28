@@ -24,6 +24,38 @@ import { MobEntity, MobType } from './mobs/MobEntity';
 import { settingsManager } from './core/SettingsManager';
 import { AchievementManager } from './core/AchievementManager';
 import { MultiplayerManager } from './core/MultiplayerManager';
+import { WeatherSystem } from './world/WeatherSystem';
+import { TNTEntity } from './world/TNTEntity';
+
+export function getBlockColorHex(blockId: number): number {
+  switch (blockId) {
+    case 1: case 19: return 0x7f8c8d; // Stone/Cobble
+    case 2: return 0x795548; // Dirt
+    case 3: return 0x4caf50; // Grass
+    case 4: case 21: return 0xf1c40f; // Sand
+    case 5: return 0x95a5a6; // Gravel
+    case 6: case 20: return 0x8e44ad; // Wood
+    case 7: return 0x27ae60; // Leaves
+    case 8: return 0xe0f7fa; // Glass
+    case 9: return 0x2980b9; // Water
+    case 10: return 0xe67e22; // Lava
+    case 12: return 0x222222; // Coal
+    case 13: return 0xd98880; // Iron
+    case 14: return 0xf1c40f; // Gold
+    case 15: return 0x33ffff; // Diamond
+    case 16: return 0xe74c3c; // Redstone
+    case 17: return 0x2ecc71; // Emerald
+    case 18: return 0x2980b9; // Lapis
+    case 23: case 24: return 0xf5f5f5; // Snow
+    case 26: return 0x2c003e; // Obsidian
+    case 27: return 0xffaa00; // Torch
+    case 28: case 29: case 30: case 31: return 0x9e7343; // Utilities
+    case 53: return 0x8b0000; // Netherrack
+    case 54: return 0x5c3a21; // Soul sand
+    case 59: return 0xd63031; // TNT
+    default: return 0x888888;
+  }
+}
 
 // Helper mapping inventory item IDs to block placement IDs
 export const BLOCK_PLACEMENT_MAP: { [key: string]: number } = {
@@ -77,6 +109,8 @@ export class Game {
   public dayNightCycle!: DayNightCycle;
   public mobManager!: MobManager;
   public multiplayerManager!: MultiplayerManager;
+  public weatherSystem = new WeatherSystem();
+  public tntEntities: TNTEntity[] = [];
 
   // Active Save World State
   public activeWorld: WorldMetadata | null = null;
@@ -85,6 +119,10 @@ export class Game {
   private totalPlaytime = 0;
   private chunkUpdateTimer = 0;
   public cameraMode: 'first' | 'third_back' | 'third_front' = 'first';
+
+  // Combat / Weapons
+  public isBowCharging = false;
+  public bowChargeTimer = 0;
 
   // Loop & timing
   private lastTime = 0;
@@ -630,6 +668,34 @@ export class Game {
       this.mobManager.update(deltaSec, this.player, this.chunkManager);
       this.multiplayerManager.update(now);
 
+      // Weather System Tick
+      const currentBiome = this.chunkManager.getBiomeAt(Math.floor(this.player.position.x), Math.floor(this.player.position.z));
+      this.weatherSystem.update(deltaSec, this.player.position, currentBiome, this.renderer.particleSystem);
+
+      // Active TNT Entities Tick
+      for (let i = this.tntEntities.length - 1; i >= 0; i--) {
+        const tnt = this.tntEntities[i];
+        tnt.update(
+          deltaSec,
+          this.chunkManager,
+          this.renderer.particleSystem,
+          this.player,
+          this.mobManager,
+          this.renderer.scene,
+          () => this.renderer.addScreenShake(0.35, 0.45)
+        );
+        if (tnt.isDead) {
+          this.tntEntities.splice(i, 1);
+        }
+      }
+
+      // Check Underwater status
+      const eyeX = Math.floor(this.player.position.x);
+      const eyeY = Math.floor(this.player.position.y + this.player.eyeHeight);
+      const eyeZ = Math.floor(this.player.position.z);
+      const eyeBlock = this.chunkManager.getBlock(eyeX, eyeY, eyeZ);
+      this.player.isUnderwater = (eyeBlock === 9);
+
       // Portal Collision Check
       const px = Math.floor(this.player.position.x);
       const py = Math.floor(this.player.position.y);
@@ -729,19 +795,17 @@ export class Game {
       this.renderer.camera.position.copy(origin);
       this.renderer.camera.lookAt(origin.clone().add(dir));
     } else if (this.cameraMode === 'third_back') {
-      // Raycast to prevent clipping through blocks/walls behind player
       const backRay = Raycaster.cast(origin, dir.clone().negate(), 3.0, this.chunkManager);
       const dist = backRay ? Math.max(0.4, backRay.distance - 0.2) : 3.0;
       const camPos = origin.clone().sub(dir.clone().multiplyScalar(dist));
       this.renderer.camera.position.copy(camPos);
-      this.renderer.camera.lookAt(origin.clone().add(dir.clone().multiplyScalar(5.0))); // Look slightly ahead of player
+      this.renderer.camera.lookAt(origin.clone().add(dir.clone().multiplyScalar(5.0)));
     } else if (this.cameraMode === 'third_front') {
-      // Raycast to prevent clipping through blocks in front of player
       const frontRay = Raycaster.cast(origin, dir, 3.0, this.chunkManager);
       const dist = frontRay ? Math.max(0.4, frontRay.distance - 0.2) : 3.0;
       const camPos = origin.clone().add(dir.clone().multiplyScalar(dist));
       this.renderer.camera.position.copy(camPos);
-      this.renderer.camera.lookAt(origin); // Look directly at player
+      this.renderer.camera.lookAt(origin);
     }
 
     // Update player model visual mesh in 3D scene (hidden in 1st person)
@@ -757,12 +821,31 @@ export class Game {
       now
     );
 
-    // Render frame
+    // 1st-Person ViewModel (Arm, Tools, Blocks, Bobbing & Swinging)
+    this.renderer.viewModel.setHeldItem(this.player.inventory.getSelected());
+    this.renderer.viewModel.setSkin(activeSkin);
+    this.renderer.viewModel.update(
+      deltaSec,
+      this.renderer.camera,
+      this.player.velocity,
+      this.player.onGround,
+      this.cameraMode,
+      now
+    );
+
+    // Particle System Tick
+    this.renderer.particleSystem.update(deltaSec, this.player.position);
+
+    // Render frame pass
     this.renderer.render(
       this.dayNightCycle.getTime(),
       this.player.position,
       now,
-      this.chunkManager.currentDimension === 'nether'
+      this.chunkManager.currentDimension === 'nether',
+      deltaSec,
+      this.player.isUnderwater,
+      this.weatherSystem.getLightningIntensity(),
+      this.weatherSystem.getSkyDarkness()
     );
   }
 
@@ -770,7 +853,6 @@ export class Game {
     const eyeY = this.player.position.y + this.player.eyeHeight;
     const origin = new THREE.Vector3(this.player.position.x, eyeY, this.player.position.z);
 
-    // Camera look direction
     const dir = new THREE.Vector3();
     this.renderer.camera.getWorldDirection(dir);
 
@@ -778,7 +860,6 @@ export class Game {
     this.hitResult = hit;
 
     if (hit) {
-      // Position selection box outline centered on targeted block
       this.selectionBox.position.set(hit.blockX + 0.5, hit.blockY + 0.5, hit.blockZ + 0.5);
       this.selectionBox.visible = true;
     } else {
@@ -787,13 +868,16 @@ export class Game {
   }
 
   private handleLeftClick(): void {
-    // Check if we hit a mob first
+    // 1. Trigger Viewmodel arm swing
+    this.renderer.viewModel.triggerSwing();
+
+    // 2. Check if we hit a mob
     const eyeY = this.player.position.y + this.player.eyeHeight;
     const origin = new THREE.Vector3(this.player.position.x, eyeY, this.player.position.z);
     const dir = new THREE.Vector3();
     this.renderer.camera.getWorldDirection(dir);
 
-    if (this.mobManager && this.mobManager.checkAttack(origin, dir, 4.0, this.player)) {
+    if (this.mobManager && this.mobManager.checkAttack(origin, dir, 4.0, this.player, this.renderer.particleSystem)) {
       this.resetMining();
       return;
     }
@@ -808,7 +892,6 @@ export class Game {
   private updateMining(deltaSec: number): void {
     if (!this.isLeftClickHeld) return;
 
-    // Ensure we are clicking the same block we started mining
     if (!this.hitResult || !this.miningTarget) {
       this.resetMining();
       return;
@@ -826,26 +909,36 @@ export class Game {
     const block = getBlock(this.hitResult.blockId);
     if (block.hardness === -1) return; // Unbreakable bedrock
 
-    // Calculate break speed based on active held tool
     const held = this.player.inventory.getSelected();
     let speedMultiplier = 1.0;
     
     if (held) {
-      if (held.id.includes('pickaxe') && (block.id === 1 || block.id === 19 || block.id === 12 || block.id === 15)) {
-        // Pickaxe vs stone-types
+      if (held.id.includes('pickaxe') && (block.id === 1 || block.id === 19 || block.id === 12 || block.id === 13 || block.id === 14 || block.id === 15)) {
         if (held.id.startsWith('wood_')) speedMultiplier = 3.0;
         else if (held.id.startsWith('stone_')) speedMultiplier = 5.0;
         else if (held.id.startsWith('iron_')) speedMultiplier = 8.0;
         else if (held.id.startsWith('diamond_')) speedMultiplier = 12.0;
+      } else if (held.id.includes('axe') && (block.id === 6 || block.id === 20 || block.id === 70)) {
+        if (held.id.startsWith('wood_')) speedMultiplier = 3.0;
+        else if (held.id.startsWith('stone_')) speedMultiplier = 5.0;
+        else if (held.id.startsWith('iron_')) speedMultiplier = 8.0;
+        else if (held.id.startsWith('diamond_')) speedMultiplier = 12.0;
+      } else if (held.id.includes('shovel') && (block.id === 2 || block.id === 3 || block.id === 4 || block.id === 5)) {
+        speedMultiplier = 4.0;
       }
     }
 
     const totalDuration = block.hardness / speedMultiplier;
     this.miningProgress += deltaSec;
 
-    // Trigger crunch audio cues
+    // Trigger crunch audio & dust particles
     if (Math.floor(this.miningProgress * 5) > Math.floor((this.miningProgress - deltaSec) * 5)) {
       AssetLoader.playSound('dig', block.id);
+      this.renderer.particleSystem.spawnBlockBreak(
+        new THREE.Vector3(this.miningTarget.x + 0.5, this.miningTarget.y + 0.5, this.miningTarget.z + 0.5),
+        getBlockColorHex(block.id),
+        2
+      );
     }
 
     if (this.miningProgress >= totalDuration) {
@@ -855,18 +948,34 @@ export class Game {
       eventBus.emit('block_broken', { x: this.miningTarget.x, y: this.miningTarget.y, z: this.miningTarget.z });
       AssetLoader.playSound('dig', block.id);
 
+      // Particle explosion for broken block
+      this.renderer.particleSystem.spawnBlockBreak(
+        new THREE.Vector3(this.miningTarget.x + 0.5, this.miningTarget.y + 0.5, this.miningTarget.z + 0.5),
+        getBlockColorHex(block.id),
+        16
+      );
+
       // If we broke Obsidian or a Portal block, clear adjacent portals
       if (oldBlockId === 26 || oldBlockId === 72) {
         this.clearPortal(this.miningTarget.x, this.miningTarget.y, this.miningTarget.z);
       }
 
-      // Loot item drop drop simulation
+      // Loot item drop
       const itemToDrop = block.lootItem || block.name.toLowerCase().replace(' ', '_');
       this.player.inventory.addItem(createItemStack(itemToDrop, 1));
 
-      // Award Level XP: Ores give 25 XP, stone/cobble give 5 XP, others give 2 XP
+      // Damage held tool durability
+      if (held && held.durability !== undefined && held.durability > 0) {
+        held.durability--;
+        if (held.durability <= 0) {
+          this.player.inventory.consumeSelected();
+          AssetLoader.playSound('item_break');
+        }
+      }
+
+      // Award Level XP
       let xpAmount = 2;
-      if (block.id >= 14 && block.id <= 20) {
+      if (block.id >= 12 && block.id <= 20) {
         xpAmount = 25;
       } else if (block.id === 1 || block.id === 19) {
         xpAmount = 5;
@@ -883,21 +992,72 @@ export class Game {
   }
 
   private handleRightClick(): void {
-    if (!this.hitResult) return;
+    const eyeY = this.player.position.y + this.player.eyeHeight;
+    const origin = new THREE.Vector3(this.player.position.x, eyeY, this.player.position.z);
+    const dir = new THREE.Vector3();
+    this.renderer.camera.getWorldDirection(dir);
 
     // Retrieve held item
     const heldStack = this.player.inventory.getSelected();
+
+    // 1. Food Consumption Check
+    if (heldStack && ['apple', 'bread', 'cooked_beef', 'cooked_porkchop', 'melon_slice', 'golden_apple'].includes(heldStack.id)) {
+      if (this.player.tryEatHeldFood()) {
+        AssetLoader.playSound('eat');
+        this.renderer.particleSystem.spawnEatingParticles(origin);
+        this.renderer.viewModel.setEating(true);
+        setTimeout(() => this.renderer.viewModel.setEating(false), 350);
+        return;
+      }
+    }
+
+    // 2. Bow Shooting Check
+    if (heldStack && heldStack.id === 'bow') {
+      AssetLoader.playSound('shoot');
+      this.renderer.viewModel.triggerSwing();
+      const arrowId = Math.random().toString(36).substring(2, 9);
+      const arrowVel = dir.clone().multiplyScalar(24.0);
+      arrowVel.y += 1.5;
+      this.mobManager.spawnArrow(arrowId, origin.clone().add(dir.clone().multiplyScalar(0.5)), arrowVel);
+      return;
+    }
+
+    if (!this.hitResult) return;
+
+    // 3. Interactive Block Checks (Crafting Table, Furnace, TNT)
+    const hitBlockId = this.hitResult.blockId;
+
+    if (hitBlockId === 28) {
+      // Crafting Table -> Open 3x3 Crafting UI
+      eventBus.emit('open_crafting_table_3x3');
+      return;
+    }
+
+    if (hitBlockId === 29 || hitBlockId === 30) {
+      // Furnace -> Open Furnace Smelting UI
+      eventBus.emit('open_furnace');
+      return;
+    }
+
+    if (hitBlockId === 59) {
+      // Primed TNT ignition!
+      const bx = this.hitResult.blockX;
+      const by = this.hitResult.blockY;
+      const bz = this.hitResult.blockZ;
+      this.chunkManager.setBlock(bx, by, bz, 0); // remove block
+      this.tntEntities.push(new TNTEntity(Math.random().toString(36).substring(2, 9), new THREE.Vector3(bx + 0.5, by + 0.5, bz + 0.5), this.renderer.scene));
+      return;
+    }
+
     if (!heldStack) return;
+
+    // Trigger Viewmodel block place animation
+    this.renderer.viewModel.triggerPlace();
 
     // Resolve block ID to place
     const blockIdToPlace = BLOCK_PLACEMENT_MAP[heldStack.id];
     if (blockIdToPlace === undefined) {
-      // Not a placeable block item, check if food or flint and steel
-      if (heldStack.id === 'apple') {
-        this.player.eat(4); // eat apple
-        this.player.inventory.consumeSelected();
-        AssetLoader.playSound('place'); // eat crunch sound bypass
-      } else if (heldStack.id === 'flint_and_steel') {
+      if (heldStack.id === 'flint_and_steel') {
         const px = this.hitResult.blockX + this.hitResult.faceNormal.x;
         const py = this.hitResult.blockY + this.hitResult.faceNormal.y;
         const pz = this.hitResult.blockZ + this.hitResult.faceNormal.z;

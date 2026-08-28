@@ -806,9 +806,12 @@ export class AssetLoader {
   }
 
   /**
-   * Synth sound: plays standard sound effect
+   * Synth sound: plays high quality procedural sound effects
    */
-  public static playSound(type: 'dig' | 'place' | 'walk' | 'hurt' | 'jump' | 'hiss' | 'explode' | 'shoot' | 'hit', blockId = 0): void {
+  public static playSound(
+    type: 'dig' | 'place' | 'walk' | 'hurt' | 'jump' | 'hiss' | 'explode' | 'shoot' | 'hit' | 'splash' | 'eat' | 'burp' | 'bow_draw' | 'sword_sweep' | 'crit' | 'thunder' | 'item_break' | 'mob_moo' | 'mob_oink' | 'mob_zombie' | 'mob_skeleton' | 'mob_spider' | 'mob_chicken' | 'mob_slime',
+    blockId = 0
+  ): void {
     try {
       this.initAudio();
       if (!this.audioCtx) return;
@@ -820,136 +823,350 @@ export class AssetLoader {
       gain.connect(this.audioCtx.destination);
 
       if (type === 'dig' || type === 'walk') {
-        // Low-pass filtered noise/pop
-        osc.type = 'triangle';
-        const startFreq = blockId === 1 || blockId === 19 ? 80 : 150; // lower pitches for stone/cobble
-        osc.frequency.setValueAtTime(startFreq, now);
-        osc.frequency.exponentialRampToValueAtTime(10, now + 0.15);
+        const isWalk = (type === 'walk');
+        const duration = isWalk ? 0.08 : 0.14;
+        const volume = isWalk ? 0.08 : 0.16;
 
-        gain.gain.setValueAtTime(0.15, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+        // Material-specific pitch, oscillator shape, and filters
+        if (blockId === 6 || blockId === 20 || blockId === 70 || blockId === 28) {
+          // Wood / Crafting: warm hollow thud
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(140 + (Math.random() - 0.5) * 20, now);
+          osc.frequency.exponentialRampToValueAtTime(40, now + duration);
+        } else if (blockId === 1 || blockId === 19 || blockId === 34 || blockId === 21 || blockId === 26 || blockId === 50 || blockId === 51 || blockId === 52) {
+          // Stone / Ores / Metals: crisp hard tap
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(220 + (Math.random() - 0.5) * 40, now);
+          osc.frequency.exponentialRampToValueAtTime(30, now + duration);
+        } else if (blockId === 4 || blockId === 5 || blockId === 54) {
+          // Sand / Gravel: gritty noise
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(110 + (Math.random() - 0.5) * 20, now);
+          osc.frequency.exponentialRampToValueAtTime(20, now + duration);
+        } else if (blockId === 7 || blockId === 80 || blockId === 41 || blockId === 42 || blockId === 43) {
+          // Foliage / Grass: soft rustle
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(320 + (Math.random() - 0.5) * 60, now);
+          osc.frequency.exponentialRampToValueAtTime(80, now + duration);
+        } else if (blockId === 8 || blockId === 32 || blockId === 23 || blockId === 24) {
+          // Glass / Ice / Snow: high snap
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(540 + (Math.random() - 0.5) * 80, now);
+          osc.frequency.exponentialRampToValueAtTime(100, now + duration);
+        } else {
+          // Dirt / generic default
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(100 + (Math.random() - 0.5) * 20, now);
+          osc.frequency.exponentialRampToValueAtTime(20, now + duration);
+        }
+
+        gain.gain.setValueAtTime(volume, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
         osc.start(now);
-        osc.stop(now + 0.15);
+        osc.stop(now + duration);
       } else if (type === 'place') {
-        // High click
+        // High click / snap
         osc.type = 'sine';
-        osc.frequency.setValueAtTime(300, now);
-        osc.frequency.exponentialRampToValueAtTime(150, now + 0.1);
+        osc.frequency.setValueAtTime(280 + Math.random() * 50, now);
+        osc.frequency.exponentialRampToValueAtTime(120, now + 0.08);
 
         gain.gain.setValueAtTime(0.12, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
 
         osc.start(now);
-        osc.stop(now + 0.1);
+        osc.stop(now + 0.08);
       } else if (type === 'jump') {
-        // Subtle upward sweep
+        // Upward sweep
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(120, now);
-        osc.frequency.exponentialRampToValueAtTime(240, now + 0.12);
+        osc.frequency.exponentialRampToValueAtTime(260, now + 0.12);
 
-        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.setValueAtTime(0.09, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
 
         osc.start(now);
         osc.stop(now + 0.12);
       } else if (type === 'hurt') {
-        // Descending synth oof
+        // Synth oof
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(160, now);
-        osc.frequency.linearRampToValueAtTime(80, now + 0.25);
+        osc.frequency.setValueAtTime(170, now);
+        osc.frequency.linearRampToValueAtTime(75, now + 0.22);
 
         gain.gain.setValueAtTime(0.25, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+        gain.gain.exponentialRampToValueAtTime(0.005, now + 0.22);
 
         osc.start(now);
-        osc.stop(now + 0.25);
+        osc.stop(now + 0.22);
       } else if (type === 'hiss') {
-        // White noise bandpass sweep for creeper fuse
+        // Bandpass noise sweep for creeper fuse
         const bufferSize = this.audioCtx.sampleRate * 1.5;
         const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
         const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          data[i] = Math.random() * 2 - 1;
-        }
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
         const noise = this.audioCtx.createBufferSource();
         noise.buffer = buffer;
 
         const filter = this.audioCtx.createBiquadFilter();
         filter.type = 'bandpass';
-        filter.frequency.setValueAtTime(1200, now);
+        filter.frequency.setValueAtTime(1400, now);
 
         noise.connect(filter);
         filter.connect(gain);
 
-        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.setValueAtTime(0.08, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
 
         noise.start(now);
         noise.stop(now + 1.5);
       } else if (type === 'explode') {
-        // Low-pitch noise + rumble
-        const bufferSize = this.audioCtx.sampleRate * 0.8;
+        // Deep explosion boom + sub-bass punch
+        const bufferSize = this.audioCtx.sampleRate * 0.9;
         const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
         const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          data[i] = Math.random() * 2 - 1;
-        }
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
         const noise = this.audioCtx.createBufferSource();
         noise.buffer = buffer;
 
         const filter = this.audioCtx.createBiquadFilter();
         filter.type = 'lowpass';
-        filter.frequency.setValueAtTime(250, now);
-        filter.frequency.exponentialRampToValueAtTime(10, now + 0.8);
+        filter.frequency.setValueAtTime(320, now);
+        filter.frequency.exponentialRampToValueAtTime(15, now + 0.9);
 
         noise.connect(filter);
         filter.connect(gain);
 
-        // Combine with a low frequency sine wave for punch
         const subOsc = this.audioCtx.createOscillator();
-        subOsc.type = 'sawtooth';
-        subOsc.frequency.setValueAtTime(90, now);
-        subOsc.frequency.linearRampToValueAtTime(5, now + 0.65);
-        
+        subOsc.type = 'sine';
+        subOsc.frequency.setValueAtTime(100, now);
+        subOsc.frequency.linearRampToValueAtTime(8, now + 0.7);
+
         const subGain = this.audioCtx.createGain();
-        subGain.gain.setValueAtTime(0.35, now);
-        subGain.gain.exponentialRampToValueAtTime(0.01, now + 0.65);
+        subGain.gain.setValueAtTime(0.4, now);
+        subGain.gain.exponentialRampToValueAtTime(0.01, now + 0.7);
         subOsc.connect(subGain);
         subGain.connect(this.audioCtx.destination);
 
-        gain.gain.setValueAtTime(0.35, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
-        
-        noise.start(now);
-        noise.stop(now + 0.8);
-        subOsc.start(now);
-        subOsc.stop(now + 0.8);
-      } else if (type === 'shoot') {
-        // High frequency sweep
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(450, now);
-        osc.frequency.exponentialRampToValueAtTime(900, now + 0.12);
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
 
-        gain.gain.setValueAtTime(0.08, now);
+        noise.start(now);
+        noise.stop(now + 0.9);
+        subOsc.start(now);
+        subOsc.stop(now + 0.7);
+      } else if (type === 'bow_draw') {
+        // Rising tension string pitch
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(200, now);
+        osc.frequency.linearRampToValueAtTime(420, now + 0.35);
+
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+        osc.start(now);
+        osc.stop(now + 0.35);
+      } else if (type === 'shoot') {
+        // Bow twang
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(520, now);
+        osc.frequency.exponentialRampToValueAtTime(180, now + 0.15);
+
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+        osc.start(now);
+        osc.stop(now + 0.15);
+      } else if (type === 'hit') {
+        // Arrow thump
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(35, now + 0.1);
+
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+        osc.start(now);
+        osc.stop(now + 0.1);
+      } else if (type === 'sword_sweep') {
+        // Whoosh air sweep
+        const bufferSize = this.audioCtx.sampleRate * 0.18;
+        const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = this.audioCtx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = this.audioCtx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(800, now);
+        filter.frequency.exponentialRampToValueAtTime(200, now + 0.18);
+
+        noise.connect(filter);
+        filter.connect(gain);
+
+        gain.gain.setValueAtTime(0.14, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+        noise.start(now);
+        noise.stop(now + 0.18);
+      } else if (type === 'crit') {
+        // High sparkle chime
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, now);
+        osc.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
+
+        gain.gain.setValueAtTime(0.1, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
 
         osc.start(now);
         osc.stop(now + 0.12);
-      } else if (type === 'hit') {
-        // Arrow thump
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(140, now);
-        osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+      } else if (type === 'eat') {
+        // Crunching bite
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(240 + Math.random() * 80, now);
+        osc.frequency.exponentialRampToValueAtTime(70, now + 0.1);
 
         gain.gain.setValueAtTime(0.12, now);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
 
         osc.start(now);
         osc.stop(now + 0.1);
+      } else if (type === 'burp') {
+        // Low pitch burp oof
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(130, now);
+        osc.frequency.linearRampToValueAtTime(60, now + 0.3);
+
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.005, now + 0.3);
+
+        osc.start(now);
+        osc.stop(now + 0.3);
+      } else if (type === 'splash') {
+        // Water splash
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(60, now + 0.25);
+
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+        osc.start(now);
+        osc.stop(now + 0.25);
+      } else if (type === 'thunder') {
+        // Deep multi-stage thunder rumble
+        const bufferSize = this.audioCtx.sampleRate * 2.5;
+        const buffer = this.audioCtx.createBuffer(1, bufferSize, this.audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        const noise = this.audioCtx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = this.audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(180, now);
+        filter.frequency.exponentialRampToValueAtTime(25, now + 2.5);
+
+        noise.connect(filter);
+        filter.connect(gain);
+
+        gain.gain.setValueAtTime(0.45, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+
+        noise.start(now);
+        noise.stop(now + 2.5);
+      } else if (type === 'item_break') {
+        // Tool snap
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(480, now);
+        osc.frequency.exponentialRampToValueAtTime(90, now + 0.15);
+
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+        osc.start(now);
+        osc.stop(now + 0.15);
+      } else if (type === 'mob_moo') {
+        // Cow Moo
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(95, now);
+        osc.frequency.linearRampToValueAtTime(75, now + 0.6);
+
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+        osc.start(now);
+        osc.stop(now + 0.6);
+      } else if (type === 'mob_oink') {
+        // Pig Oink
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(280, now);
+        osc.frequency.linearRampToValueAtTime(180, now + 0.18);
+
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+        osc.start(now);
+        osc.stop(now + 0.18);
+      } else if (type === 'mob_zombie') {
+        // Zombie Groan
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(80, now);
+        osc.frequency.linearRampToValueAtTime(60, now + 0.7);
+
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+
+        osc.start(now);
+        osc.stop(now + 0.7);
+      } else if (type === 'mob_skeleton') {
+        // Skeleton Bone Rattle
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(450, now);
+        osc.frequency.exponentialRampToValueAtTime(150, now + 0.12);
+
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+        osc.start(now);
+        osc.stop(now + 0.12);
+      } else if (type === 'mob_spider') {
+        // Spider Hiss
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(650, now);
+        osc.frequency.exponentialRampToValueAtTime(250, now + 0.2);
+
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+        osc.start(now);
+        osc.stop(now + 0.2);
+      } else if (type === 'mob_chicken') {
+        // Chicken Cluck
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(580, now);
+        osc.frequency.exponentialRampToValueAtTime(320, now + 0.1);
+
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+        osc.start(now);
+        osc.stop(now + 0.1);
+      } else if (type === 'mob_slime') {
+        // Slime Squish
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.linearRampToValueAtTime(320, now + 0.08);
+        osc.frequency.linearRampToValueAtTime(80, now + 0.18);
+
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+        osc.start(now);
+        osc.stop(now + 0.18);
       }
     } catch (e) {
-      console.warn('Audio context playback failed (needs user gesture interaction).', e);
+      console.warn('Audio context playback failed.', e);
     }
   }
 

@@ -1548,4 +1548,132 @@ body, html {
   100% { transform: rotate(0deg); }
 }
 
+/* =========================================================================
+   ULTRA HUD & MODAL EXTENSIONS (Damage Vignette, 3x3 Grid, Furnace, Bars)
+   ========================================================================= */
+
+/* Fullscreen Red Damage Vignette */
+.damage-vignette {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 45;
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
+  box-shadow: inset 0 0 100px 30px rgba(230, 20, 20, 0.7);
+}
+
+.damage-vignette.active {
+  opacity: 1;
+}
+
+/* Dual-Row HUD Status Bars (Armor above Health, Oxygen above Hunger) */
+.hud-status-bars-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 400px;
+  width: auto;
+}
+
+.secondary-row {
+  min-height: 14px;
+}
+
+/* Tool Durability Bar in Slot */
+.durability-bar-container {
+  position: absolute;
+  bottom: 2px;
+  left: 3px;
+  right: 3px;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 1px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.durability-bar-fill {
+  height: 100%;
+  transition: width 0.1s ease;
+}
+
+/* 3x3 Crafting Table Grid */
+.craft-grid-3x3 {
+  display: grid;
+  grid-template-columns: repeat(3, 44px);
+  grid-template-rows: repeat(3, 44px);
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 6px;
+  border-radius: 4px;
+  border: 2px solid var(--color-border);
+}
+
+.inventory-crafting-section.wide {
+  min-width: 220px;
+}
+
+.craft-3x3-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Furnace Smelting GUI */
+.furnace-smelting-area {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 16px;
+  border-radius: 6px;
+  border: 2px solid var(--color-border);
+}
+
+.furnace-grid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.furnace-flame-container {
+  font-size: 1.2rem;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: flickerFlame 1s infinite alternate;
+}
+
+@keyframes flickerFlame {
+  0% { transform: scale(1.0); opacity: 0.8; }
+  100% { transform: scale(1.2); opacity: 1.0; filter: drop-shadow(0 0 6px #ff7700); }
+}
+
+.furnace-progress-arrow {
+  font-size: 1.6rem;
+  color: var(--color-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.furnace-progress-fill {
+  animation: pulseArrow 1.5s infinite;
+}
+
+@keyframes pulseArrow {
+  0% { transform: translateX(-2px); opacity: 0.6; }
+  50% { transform: translateX(2px); opacity: 1.0; }
+  100% { transform: translateX(-2px); opacity: 0.6; }
+}
+
+
 

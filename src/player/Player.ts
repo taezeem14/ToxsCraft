@@ -30,18 +30,25 @@ export class Player {
   public maxHunger = 20.0;
   public stamina = 20.0;
   public maxStamina = 20.0;
+  public oxygen = 20.0;
+  public maxOxygen = 20.0;
+  public isUnderwater = false;
   public isDead = false;
 
   // Level progression stats
   public level = 1;
   public xp = 0;
 
+  // Combat & weapons
+  public bowCharge = 0;
+  public isChargingBow = false;
+
   // Inventory
   public inventory = new Inventory();
 
   private regenTimer = 0;
-
   private hungerTimer = 0;
+  private drownTimer = 0;
 
   constructor() {
     // Listen for custom teleport/reset events if needed
@@ -52,6 +59,7 @@ export class Player {
     this.health = 20.0;
     this.hunger = 20.0;
     this.stamina = 20.0;
+    this.oxygen = 20.0;
     this.isDead = false;
     this.velocity.set(0, 0, 0);
     eventBus.emit('player_status_change');
@@ -120,15 +128,58 @@ export class Player {
   }
 
   /**
-   * Processes player stats (regeneration, hunger drain) per frame tick
+   * Calculates total armor defense value from slots 45-48
+   */
+  public getArmorPoints(): number {
+    let points = 0;
+    const slots = this.inventory.getSlots();
+
+    // 45: Helmet, 46: Chestplate, 47: Leggings, 48: Boots
+    const armorValues: { [key: string]: number } = {
+      'leather_helmet': 1, 'leather_chestplate': 3, 'leather_leggings': 2, 'leather_boots': 1,
+      'iron_helmet': 2, 'iron_chestplate': 6, 'iron_leggings': 5, 'iron_boots': 2,
+      'diamond_helmet': 3, 'diamond_chestplate': 8, 'diamond_leggings': 6, 'diamond_boots': 3
+    };
+
+    for (let i = 45; i <= 48; i++) {
+      const item = slots[i];
+      if (item && armorValues[item.id]) {
+        points += armorValues[item.id];
+      }
+    }
+    return Math.min(20, points);
+  }
+
+  /**
+   * Processes player stats (regeneration, hunger drain, oxygen) per frame tick
    */
   public update(deltaSec: number): void {
     if (this.isDead) return;
 
+    // Handle Oxygen / Drowning
+    if (this.isUnderwater && !this.isCreative) {
+      this.oxygen = Math.max(0, this.oxygen - deltaSec * 3.0); // 20 units lasts ~6.5 seconds
+      eventBus.emit('player_status_change');
+
+      if (this.oxygen <= 0) {
+        this.drownTimer += deltaSec;
+        if (this.drownTimer >= 1.0) { // 2 damage per second when suffocating
+          this.takeDamage(2.0, true);
+          this.drownTimer = 0;
+        }
+      }
+    } else {
+      if (this.oxygen < this.maxOxygen) {
+        this.oxygen = Math.min(this.maxOxygen, this.oxygen + deltaSec * 10.0); // fast recovery
+        eventBus.emit('player_status_change');
+      }
+      this.drownTimer = 0;
+    }
+
     // Handle Health Regeneration (if full or nearly full hunger)
     if (this.hunger >= 18.0 && this.health < this.maxHealth) {
       this.regenTimer += deltaSec;
-      if (this.regenTimer >= 4.0) { // Regens 1 HP every 4 seconds
+      if (this.regenTimer >= 3.5) { // Regens 1 HP every 3.5 seconds
         this.heal(1.0);
         this.regenTimer = 0;
       }
@@ -138,18 +189,26 @@ export class Player {
 
     // Passive hunger drain over time
     this.hungerTimer += deltaSec;
-    const drainRate = this.velocity.length() > 5.0 ? 0.05 : 0.01; // faster drain when running
+    const drainRate = this.velocity.length() > 5.0 ? 0.06 : 0.012; // faster drain when running
     if (this.hungerTimer >= 3.0) {
       this.drainHunger(drainRate);
       this.hungerTimer = 0;
     }
   }
 
-  public takeDamage(amount: number): void {
+  public takeDamage(amount: number, ignoreArmor = false): void {
     if (this.isDead || this.isCreative) return; // Godmode in creative mode
 
-    this.health = Math.max(0, this.health - amount);
-    eventBus.emit('player_hurt', amount);
+    let effectiveDamage = amount;
+    if (!ignoreArmor) {
+      const armor = this.getArmorPoints();
+      // Minecraft formula: reduction = min(20, max(armor / 5, armor - damage / (2 + toughness / 4))) / 25
+      const reduction = (armor * 0.04); // 4% reduction per armor point up to 80%
+      effectiveDamage = Math.max(1.0, amount * (1.0 - reduction));
+    }
+
+    this.health = Math.max(0, this.health - effectiveDamage);
+    eventBus.emit('player_hurt', effectiveDamage);
     eventBus.emit('player_status_change');
 
     if (this.health <= 0) {
@@ -169,6 +228,29 @@ export class Player {
     eventBus.emit('player_status_change');
   }
 
+  public tryEatHeldFood(): boolean {
+    const held = this.inventory.getSelected();
+    if (!held) return false;
+
+    const foodValues: { [key: string]: { hunger: number; heal?: number } } = {
+      'apple': { hunger: 4, heal: 1 },
+      'bread': { hunger: 5 },
+      'cooked_beef': { hunger: 8, heal: 2 },
+      'cooked_porkchop': { hunger: 8, heal: 2 },
+      'melon_slice': { hunger: 2 },
+      'golden_apple': { hunger: 6, heal: 8 }
+    };
+
+    const food = foodValues[held.id];
+    if (food && (this.hunger < this.maxHunger || (food.heal && this.health < this.maxHealth))) {
+      this.eat(food.hunger);
+      if (food.heal) this.heal(food.heal);
+      this.inventory.consumeSelected();
+      return true;
+    }
+    return false;
+  }
+
   private drainHunger(amount: number): void {
     if (this.isCreative) return; // No hunger decay in creative mode
     this.hunger = Math.max(0, this.hunger - amount);
@@ -176,7 +258,7 @@ export class Player {
 
     // Starvation damage
     if (this.hunger <= 0 && this.health > 1.0) {
-      this.takeDamage(0.5); // starves down to half-heart on normal difficulty
+      this.takeDamage(0.5, true); // starves down to half-heart on normal difficulty
     }
   }
 
@@ -185,8 +267,6 @@ export class Player {
     this.velocity.set(0, 0, 0);
     eventBus.emit('player_die');
   }
-
-
 
   public addXp(amount: number): void {
     if (this.isDead) return;

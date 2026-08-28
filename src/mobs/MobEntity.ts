@@ -1014,11 +1014,26 @@ export class MobEntity implements PhysicsEntity {
     mobManager.spawnArrow(arrowId, spawnPos, dir);
   }
 
-  public takeDamage(amount: number, mobManager: any, scene: THREE.Scene): void {
+  public takeDamage(amount: number, mobManager: any, scene: THREE.Scene, attackerPos?: THREE.Vector3, player?: Player, particleSystem?: any): void {
     this.health = Math.max(0, this.health - amount);
     
-    // Play hurt sound
-    AssetLoader.playSound('hurt');
+    // Play mob-specific hurt sound
+    if (this.type === 'cow') AssetLoader.playSound('mob_moo');
+    else if (this.type === 'pig') AssetLoader.playSound('mob_oink');
+    else if (this.type === 'zombie') AssetLoader.playSound('mob_zombie');
+    else if (this.type === 'skeleton') AssetLoader.playSound('mob_skeleton');
+    else if (this.type === 'spider') AssetLoader.playSound('mob_spider');
+    else if (this.type === 'chicken') AssetLoader.playSound('mob_chicken');
+    else if (this.type === 'slime') AssetLoader.playSound('mob_slime');
+    else AssetLoader.playSound('hurt');
+
+    // Knockback away from attacker
+    if (attackerPos) {
+      const knockDir = this.position.clone().sub(attackerPos).normalize();
+      this.velocity.x += knockDir.x * 6.0;
+      this.velocity.z += knockDir.z * 6.0;
+      this.velocity.y = Math.max(this.velocity.y, 4.0);
+    }
 
     // Visual red damage flash
     this.mesh.traverse((child) => {
@@ -1026,7 +1041,7 @@ export class MobEntity implements PhysicsEntity {
         const mats = Array.isArray(child.material) ? child.material : [child.material];
         mats.forEach(m => {
           if (m && 'color' in m) {
-            m.color.setHex(0xff8888); // tint red
+            m.color.setHex(0xff5555); // bright red damage flash
             setTimeout(() => {
               if (m && 'color' in m) m.color.setHex(0xffffff); // restore
             }, 180);
@@ -1036,6 +1051,39 @@ export class MobEntity implements PhysicsEntity {
     });
 
     if (this.health <= 0) {
+      // Spawn death poof particles
+      if (particleSystem) {
+        particleSystem.spawnHitSparks(this.position.clone().add(new THREE.Vector3(0, this.height * 0.5, 0)), true, 16);
+      }
+
+      // Grant XP and Loot to Player
+      if (player) {
+        const xpAmount = (this.isHostile ? 12 : 5);
+        player.addXp(xpAmount);
+
+        // Loot item drops
+        const inv = player.inventory;
+        if (this.type === 'cow') {
+          inv.addItem({ id: 'cooked_beef', count: 1 + Math.floor(Math.random() * 2), maxStack: 64 });
+        } else if (this.type === 'pig') {
+          inv.addItem({ id: 'cooked_porkchop', count: 1 + Math.floor(Math.random() * 2), maxStack: 64 });
+        } else if (this.type === 'chicken') {
+          inv.addItem({ id: 'feather', count: 1 + Math.floor(Math.random() * 2), maxStack: 64 });
+        } else if (this.type === 'zombie') {
+          inv.addItem({ id: 'rotten_flesh', count: 1 + Math.floor(Math.random() * 2), maxStack: 64 });
+          if (Math.random() < 0.25) inv.addItem({ id: 'raw_iron', count: 1, maxStack: 64 });
+        } else if (this.type === 'skeleton') {
+          inv.addItem({ id: 'bone', count: 1 + Math.floor(Math.random() * 2), maxStack: 64 });
+          inv.addItem({ id: 'arrow', count: 2 + Math.floor(Math.random() * 3), maxStack: 64 });
+        } else if (this.type === 'spider') {
+          inv.addItem({ id: 'string', count: 1 + Math.floor(Math.random() * 2), maxStack: 64 });
+        } else if (this.type === 'creeper') {
+          inv.addItem({ id: 'tnt', count: 1, maxStack: 64 });
+        } else if (this.type === 'pillager' || this.type === 'villager') {
+          inv.addItem({ id: 'emerald', count: 1 + Math.floor(Math.random() * 2), maxStack: 64 });
+        }
+      }
+
       // Split slime if size > 1
       if (this.type === 'slime' && this.size > 1) {
         const newSize = this.size - 1;

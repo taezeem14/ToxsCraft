@@ -31,11 +31,16 @@ export class UIManager {
     settingsScreen: document.getElementById('settings-screen')!,
     loadingScreen: document.getElementById('loading-screen')!,
     inventoryScreen: document.getElementById('inventory-screen')!,
+    craftingTableScreen: document.getElementById('crafting-table-screen')!,
+    furnaceScreen: document.getElementById('furnace-screen')!,
     deathScreen: document.getElementById('death-screen')!,
     creditsScreen: document.getElementById('credits-screen')!,
     achievementsScreen: document.getElementById('achievements-screen')!,
     skinsScreen: document.getElementById('skins-screen')!
   };
+
+  // Damage vignette element
+  private damageVignette = document.getElementById('damage-vignette');
 
   // Held item state
   private heldItem: ItemStack | null = null;
@@ -44,6 +49,18 @@ export class UIManager {
   // 2x2 Crafting inputs (indices 0-3) and output slot
   private craftInput: (ItemStack | null)[] = [null, null, null, null];
   private craftOutput: ItemStack | null = null;
+
+  // 3x3 Crafting inputs (indices 0-8) and output slot
+  private craftInput3x3: (ItemStack | null)[] = new Array(9).fill(null);
+  private craftOutput3x3: ItemStack | null = null;
+
+  // Furnace Smelting State
+  private furnaceInput: ItemStack | null = null;
+  private furnaceFuel: ItemStack | null = null;
+  private furnaceOutput: ItemStack | null = null;
+  private furnaceCookProgress = 0;
+  private furnaceBurnTimer = 0;
+
   private itemTextureCache: Map<string, string> = new Map();
 
   constructor(game: Game) {
@@ -54,6 +71,8 @@ export class UIManager {
     this.bindSettings();
     this.initHUD();
     this.initInventoryUI();
+    this.init3x3CraftingUI();
+    this.initFurnaceUI();
 
     // Pre-populate multiplayer inputs
     const urlEl = document.getElementById('input-mp-server') as HTMLInputElement;
@@ -435,6 +454,44 @@ export class UIManager {
         eventBus.emit('show_toast', `Selected Skin: ${skinName.toUpperCase()}`);
       });
     });
+
+    // 8. 3x3 Crafting Table & Furnace screen close buttons and events
+    const btnCloseCraft3x3 = document.getElementById('btn-close-crafting-table');
+    if (btnCloseCraft3x3) {
+      btnCloseCraft3x3.addEventListener('click', () => {
+        this.hideAllScreens();
+        this.hudOverlay.classList.remove('hidden');
+        this.game.inputManager.requestLock();
+      });
+    }
+
+    const btnCloseFurnace = document.getElementById('btn-close-furnace');
+    if (btnCloseFurnace) {
+      btnCloseFurnace.addEventListener('click', () => {
+        this.hideAllScreens();
+        this.hudOverlay.classList.remove('hidden');
+        this.game.inputManager.requestLock();
+      });
+    }
+
+    eventBus.on('open_crafting_table_3x3', () => {
+      document.exitPointerLock();
+      this.showScreen('craftingTableScreen');
+      this.drawCraftingTableSlots();
+    });
+
+    eventBus.on('open_furnace', () => {
+      document.exitPointerLock();
+      this.showScreen('furnaceScreen');
+      this.drawFurnaceSlots();
+    });
+
+    eventBus.on('player_hurt', () => {
+      if (this.damageVignette) {
+        this.damageVignette.classList.add('active');
+        setTimeout(() => this.damageVignette?.classList.remove('active'), 250);
+      }
+    });
   }
 
   private bindSettings(): void {
@@ -669,8 +726,17 @@ export class UIManager {
       const biome = this.game.chunkManager.getBiomeAt(p.x, p.z);
       document.getElementById('biome-val')!.textContent = biome.name;
 
+      // Weather look
+      const weatherEl = document.getElementById('weather-val');
+      if (weatherEl) {
+        weatherEl.textContent = this.game.weatherSystem.getWeather().toUpperCase();
+      }
+
       // Time string
       document.getElementById('time-val')!.textContent = this.game.dayNightCycle.getTimeString();
+
+      // Tick active furnace
+      this.tickFurnace(0.1);
     }, 100);
 
     // Bind click/touch events to HUD hotbar slots
@@ -690,7 +756,9 @@ export class UIManager {
   private drawHUDVitals(): void {
     const healthRow = document.getElementById('health-bar')!;
     const hungerRow = document.getElementById('hunger-bar')!;
-    const statusContainer = document.querySelector('.hud-status-bars') as HTMLElement;
+    const armorRow = document.getElementById('armor-bar');
+    const oxygenRow = document.getElementById('oxygen-bar');
+    const statusContainer = document.querySelector('.hud-status-bars-wrapper') as HTMLElement;
     const xpContainer = document.querySelector('.xp-container') as HTMLElement;
 
     if (this.game.player && this.game.player.isCreative) {
@@ -702,7 +770,45 @@ export class UIManager {
       if (xpContainer) xpContainer.style.display = 'flex';
     }
 
-    // 10 hearts maximum (20 HP)
+    // 1. Armor Bar (10 Shields = 20 Armor Points)
+    if (armorRow && this.game.player) {
+      const armorPoints = this.game.player.getArmorPoints();
+      if (armorPoints > 0) {
+        armorRow.style.display = 'flex';
+        let armorStr = '';
+        const fullShields = Math.floor(armorPoints / 2);
+        const halfShield = (armorPoints % 2 >= 1);
+        for (let i = 0; i < 10; i++) {
+          if (i < fullShields) armorStr += '<span style="color: #bdc3c7">🛡️</span>';
+          else if (i === fullShields && halfShield) armorStr += '<span style="color: #bdc3c7; opacity: 0.65">🛡️</span>';
+          else armorStr += '<span style="opacity: 0">🛡️</span>';
+        }
+        armorRow.innerHTML = armorStr;
+      } else {
+        armorRow.innerHTML = '';
+      }
+    }
+
+    // 2. Oxygen Bar (10 Bubbles)
+    if (oxygenRow && this.game.player) {
+      const player = this.game.player;
+      if (player.isUnderwater || player.oxygen < player.maxOxygen) {
+        oxygenRow.classList.remove('hidden');
+        oxygenRow.style.display = 'flex';
+        let o2Str = '';
+        const bubbles = Math.ceil((player.oxygen / player.maxOxygen) * 10);
+        for (let i = 0; i < 10; i++) {
+          if (i < bubbles) o2Str += '<span style="color: #00d2d3">🫧</span>';
+          else o2Str += '<span style="color: #444; opacity: 0.3">🫧</span>';
+        }
+        oxygenRow.innerHTML = o2Str;
+      } else {
+        oxygenRow.classList.add('hidden');
+        oxygenRow.style.display = 'none';
+      }
+    }
+
+    // 3. 10 hearts maximum (20 HP)
     let hpStr = '';
     const fullHearts = Math.floor(this.game.player.health / 2);
     const halfHeart = this.game.player.health % 2 >= 1;
@@ -714,7 +820,7 @@ export class UIManager {
     }
     healthRow.innerHTML = hpStr;
 
-    // 10 hunger drumsticks (20 points)
+    // 4. 10 hunger drumsticks (20 points)
     let foodStr = '';
     const fullFood = Math.floor(this.game.player.hunger / 2);
     for (let i = 0; i < 10; i++) {
@@ -723,7 +829,7 @@ export class UIManager {
     }
     hungerRow.innerHTML = foodStr;
 
-    // XP and Level rendering
+    // 5. XP and Level rendering
     const xpLevelEl = document.getElementById('xp-level');
     const xpFillEl = document.getElementById('xp-fill');
     if (xpLevelEl && xpFillEl && this.game.player) {
@@ -749,7 +855,6 @@ export class UIManager {
   }
 
   private renderSlotItem(slotEl: HTMLElement, stack: ItemStack | null): void {
-    // Preserve any .slot-number child (hotbar key labels) when clearing content
     const slotNumberEl = slotEl.querySelector('.slot-number');
     slotEl.innerHTML = '';
     if (slotNumberEl) slotEl.appendChild(slotNumberEl);
@@ -758,7 +863,6 @@ export class UIManager {
     const itemDiv = document.createElement('div');
     itemDiv.className = 'item-slot';
 
-    // Procedural texture mapping representing item icon
     const icon = document.createElement('div');
     icon.className = 'item-texture';
     icon.style.backgroundImage = `url(${this.getItemTexture(stack.id)})`;
@@ -774,6 +878,24 @@ export class UIManager {
       countLabel.className = 'item-count';
       countLabel.textContent = stack.count.toString();
       itemDiv.appendChild(countLabel);
+    }
+
+    // Durability Meter
+    if (stack.durability !== undefined && stack.maxDurability) {
+      const barContainer = document.createElement('div');
+      barContainer.className = 'durability-bar-container';
+
+      const durPct = Math.max(0, Math.min(100, (stack.durability / stack.maxDurability) * 100));
+      const fill = document.createElement('div');
+      fill.className = 'durability-bar-fill';
+      fill.style.width = `${durPct}%`;
+      
+      if (durPct > 60) fill.style.backgroundColor = '#2ecc71';
+      else if (durPct > 25) fill.style.backgroundColor = '#f1c40f';
+      else fill.style.backgroundColor = '#e74c3c';
+
+      barContainer.appendChild(fill);
+      itemDiv.appendChild(barContainer);
     }
 
     slotEl.appendChild(itemDiv);
@@ -998,6 +1120,92 @@ export class UIManager {
       r(5, 5, 6, 6, '#2980b9');
       p(4, 6, '#1f3a52');
     } 
+    else if (itemId === 'iron_ingot') {
+      r(4, 5, 8, 5, '#ecf0f1');
+      r(5, 6, 6, 3, '#bdc3c7');
+      p(4, 5, '#fff');
+    }
+    else if (itemId === 'gold_ingot') {
+      r(4, 5, 8, 5, '#f1c40f');
+      r(5, 6, 6, 3, '#f39c12');
+      p(4, 5, '#fef9e7');
+    }
+    else if (itemId === 'bow') {
+      p(3, 3, '#85633e'); p(4, 2, '#85633e'); p(5, 2, '#85633e'); p(6, 3, '#85633e');
+      p(2, 4, '#85633e'); p(2, 5, '#85633e'); p(2, 6, '#85633e'); p(3, 7, '#85633e');
+      p(4, 8, '#85633e'); p(5, 8, '#85633e'); p(6, 7, '#85633e');
+      // String
+      for (let y = 3; y <= 7; y++) p(7, y, '#ecf0f1');
+    }
+    else if (itemId === 'arrow') {
+      for (let i = 3; i <= 11; i++) p(i, 14 - i, '#85633e');
+      // Flint head
+      p(11, 2, '#7f8c8d'); p(12, 3, '#7f8c8d'); p(12, 2, '#bdc3c7');
+      // Feathers
+      p(3, 12, '#ecf0f1'); p(2, 11, '#ecf0f1');
+    }
+    else if (itemId.includes('helmet')) {
+      const col = itemId.startsWith('diamond') ? '#00d2d3' : (itemId.startsWith('iron') ? '#dcdde1' : '#85633e');
+      r(3, 3, 10, 5, col);
+      r(3, 8, 3, 4, col);
+      r(10, 8, 3, 4, col);
+      p(4, 4, '#fff'); // shine
+    }
+    else if (itemId.includes('chestplate')) {
+      const col = itemId.startsWith('diamond') ? '#00d2d3' : (itemId.startsWith('iron') ? '#dcdde1' : '#85633e');
+      r(3, 3, 10, 9, col);
+      r(6, 3, 4, 3, 'rgba(0,0,0,0)'); // neck cutout
+      r(1, 3, 2, 6, col); // left shoulder
+      r(13, 3, 2, 6, col); // right shoulder
+      p(4, 5, '#fff'); // shine
+    }
+    else if (itemId.includes('leggings')) {
+      const col = itemId.startsWith('diamond') ? '#00d2d3' : (itemId.startsWith('iron') ? '#dcdde1' : '#85633e');
+      r(4, 2, 8, 4, col);
+      r(4, 6, 3, 7, col);
+      r(9, 6, 3, 7, col);
+      p(5, 3, '#fff');
+    }
+    else if (itemId.includes('boots')) {
+      const col = itemId.startsWith('diamond') ? '#00d2d3' : (itemId.startsWith('iron') ? '#dcdde1' : '#85633e');
+      r(3, 5, 4, 7, col);
+      r(9, 5, 4, 7, col);
+      p(3, 11, col); p(9, 11, col);
+      p(4, 6, '#fff');
+    }
+    else if (itemId === 'gunpowder') {
+      r(5, 6, 6, 5, '#7f8c8d');
+      p(4, 7, '#95a5a6'); p(11, 8, '#95a5a6');
+    }
+    else if (itemId === 'string') {
+      p(4, 4, '#ecf0f1'); p(5, 5, '#ecf0f1'); p(6, 6, '#ecf0f1'); p(7, 8, '#ecf0f1'); p(8, 9, '#ecf0f1'); p(10, 11, '#ecf0f1');
+    }
+    else if (itemId === 'feather') {
+      for (let i = 3; i <= 11; i++) p(i, 14 - i, '#bdc3c7');
+      r(5, 4, 4, 4, '#ecf0f1');
+      r(8, 2, 3, 3, '#fff');
+    }
+    else if (itemId === 'bone') {
+      for (let i = 4; i <= 11; i++) p(i, 15 - i, '#ecf0f1');
+      p(3, 12, '#bdc3c7'); p(3, 11, '#bdc3c7');
+      p(11, 3, '#fff'); p(12, 3, '#fff');
+    }
+    else if (itemId === 'rotten_flesh') {
+      r(4, 5, 8, 6, '#962d22');
+      p(6, 7, '#27ae60'); p(9, 6, '#1e824c');
+    }
+    else if (itemId === 'slime_ball') {
+      r(4, 5, 8, 6, '#2ecc71');
+      r(5, 4, 6, 8, '#2ecc71');
+      p(6, 6, '#a8e6cf');
+    }
+    else if (itemId === 'golden_apple') {
+      r(5, 4, 6, 8, '#f1c40f');
+      r(4, 5, 8, 6, '#f1c40f');
+      p(6, 3, '#27ae60');
+      p(7, 3, '#85633e');
+      p(5, 5, '#fff');
+    }
     else if (itemId === 'stick') {
       for (let i = 2; i <= 13; i++) {
         p(i, 15 - i, '#85633e');
@@ -1418,5 +1626,407 @@ export class UIManager {
         option.classList.remove('selected');
       }
     });
+  }
+
+  // =========================================================================
+  // 3x3 CRAFTING TABLE SYSTEM
+  // =========================================================================
+
+  private init3x3CraftingUI(): void {
+    // Initial bindings for 3x3 crafting table
+  }
+
+  public drawCraftingTableSlots(): void {
+    const storageGrid = document.getElementById('crafting-table-slots-grid');
+    const hotbarGrid = document.getElementById('crafting-table-hotbar-grid');
+    if (!storageGrid || !hotbarGrid || !this.game.player) return;
+
+    storageGrid.innerHTML = '';
+    hotbarGrid.innerHTML = '';
+
+    // Draw main storage (slots 9 to 44)
+    for (let i = 9; i < 45; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'hotbar-slot';
+      this.renderSlotItem(slot, this.game.player.inventory.getItem(i));
+      slot.addEventListener('click', () => {
+        this.handleSlotClick(i);
+        this.drawCraftingTableSlots();
+      });
+      storageGrid.appendChild(slot);
+    }
+
+    // Draw hotbar (slots 0 to 8)
+    for (let i = 0; i < 9; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'hotbar-slot';
+      this.renderSlotItem(slot, this.game.player.inventory.getItem(i));
+      slot.addEventListener('click', () => {
+        this.handleSlotClick(i);
+        this.drawCraftingTableSlots();
+      });
+      hotbarGrid.appendChild(slot);
+    }
+
+    // Draw 3x3 crafting grid slots
+    const c3Slots = document.querySelectorAll('#crafting-grid-3x3 .craft-slot');
+    c3Slots.forEach((slot, cIdx) => {
+      this.renderSlotItem(slot as HTMLElement, this.craftInput3x3[cIdx]);
+      const newSlot = slot.cloneNode(true);
+      slot.parentNode!.replaceChild(newSlot, slot);
+      newSlot.addEventListener('click', () => this.handleCraftSlot3x3Click(cIdx));
+    });
+
+    // Draw 3x3 output slot
+    const outputEl = document.getElementById('crafting-table-output')!;
+    this.renderSlotItem(outputEl, this.craftOutput3x3);
+    const newOutput = outputEl.cloneNode(true);
+    outputEl.parentNode!.replaceChild(newOutput, outputEl);
+    newOutput.addEventListener('click', () => this.handleCraftOutput3x3Click());
+  }
+
+  private handleCraftSlot3x3Click(cIdx: number): void {
+    const current = this.craftInput3x3[cIdx];
+
+    if (!this.heldItem) {
+      if (current) {
+        this.heldItem = current;
+        this.craftInput3x3[cIdx] = null;
+      }
+    } else {
+      if (!current) {
+        this.craftInput3x3[cIdx] = this.heldItem;
+        this.heldItem = null;
+      } else if (current.id === this.heldItem.id) {
+        current.count += this.heldItem.count;
+        this.heldItem = null;
+      } else {
+        const temp = current;
+        this.craftInput3x3[cIdx] = this.heldItem;
+        this.heldItem = temp;
+      }
+    }
+    this.updateCursorElement();
+    this.resolveCrafting3x3();
+    this.drawCraftingTableSlots();
+  }
+
+  private handleCraftOutput3x3Click(): void {
+    if (this.craftOutput3x3 && !this.heldItem) {
+      this.heldItem = this.craftOutput3x3;
+      this.craftOutput3x3 = null;
+
+      for (let i = 0; i < 9; i++) {
+        if (this.craftInput3x3[i]) {
+          this.craftInput3x3[i]!.count--;
+          if (this.craftInput3x3[i]!.count <= 0) {
+            this.craftInput3x3[i] = null;
+          }
+        }
+      }
+
+      this.updateCursorElement();
+      this.resolveCrafting3x3();
+      this.drawCraftingTableSlots();
+    }
+  }
+
+  private resolveCrafting3x3(): void {
+    const grid = this.craftInput3x3.map(item => item ? item.id : null);
+    const count = grid.filter(Boolean).length;
+
+    // 1. Single Item recipes
+    if (count === 1) {
+      const item = this.craftInput3x3.find(Boolean);
+      if (item?.id === 'oak_log') { this.craftOutput3x3 = createItemStack('oak_planks', 4); return; }
+      if (item?.id === 'acacia_log') { this.craftOutput3x3 = createItemStack('oak_planks', 4); return; }
+    }
+
+    // 2. Pickaxes (3 materials top row + sticks at slot 4 & 7)
+    if (grid[0] === 'oak_planks' && grid[1] === 'oak_planks' && grid[2] === 'oak_planks' && grid[4] === 'stick' && grid[7] === 'stick' && count === 5) {
+      this.craftOutput3x3 = createItemStack('wood_pickaxe', 1); return;
+    }
+    if (grid[0] === 'cobblestone' && grid[1] === 'cobblestone' && grid[2] === 'cobblestone' && grid[4] === 'stick' && grid[7] === 'stick' && count === 5) {
+      this.craftOutput3x3 = createItemStack('stone_pickaxe', 1); return;
+    }
+    if (grid[0] === 'iron_ingot' && grid[1] === 'iron_ingot' && grid[2] === 'iron_ingot' && grid[4] === 'stick' && grid[7] === 'stick' && count === 5) {
+      this.craftOutput3x3 = createItemStack('iron_pickaxe', 1); return;
+    }
+    if (grid[0] === 'diamond' && grid[1] === 'diamond' && grid[2] === 'diamond' && grid[4] === 'stick' && grid[7] === 'stick' && count === 5) {
+      this.craftOutput3x3 = createItemStack('diamond_pickaxe', 1); return;
+    }
+
+    // 3. Swords (2 materials vertically + stick at bottom)
+    const checkSword = (mat: string) => {
+      return (
+        (grid[0] === mat && grid[3] === mat && grid[6] === 'stick' && count === 3) ||
+        (grid[1] === mat && grid[4] === mat && grid[7] === 'stick' && count === 3) ||
+        (grid[2] === mat && grid[5] === mat && grid[8] === 'stick' && count === 3)
+      );
+    };
+    if (checkSword('oak_planks')) { this.craftOutput3x3 = createItemStack('wood_sword', 1); return; }
+    if (checkSword('cobblestone')) { this.craftOutput3x3 = createItemStack('stone_sword', 1); return; }
+    if (checkSword('iron_ingot')) { this.craftOutput3x3 = createItemStack('iron_sword', 1); return; }
+    if (checkSword('diamond')) { this.craftOutput3x3 = createItemStack('diamond_sword', 1); return; }
+
+    // 4. Axes
+    if ((grid[0] === 'oak_planks' && grid[1] === 'oak_planks' && grid[3] === 'oak_planks' && grid[4] === 'stick' && grid[7] === 'stick' && count === 5) ||
+        (grid[1] === 'oak_planks' && grid[2] === 'oak_planks' && grid[5] === 'oak_planks' && grid[4] === 'stick' && grid[7] === 'stick' && count === 5)) {
+      this.craftOutput3x3 = createItemStack('wood_axe', 1); return;
+    }
+    if ((grid[0] === 'cobblestone' && grid[1] === 'cobblestone' && grid[3] === 'cobblestone' && grid[4] === 'stick' && grid[7] === 'stick' && count === 5) ||
+        (grid[1] === 'cobblestone' && grid[2] === 'cobblestone' && grid[5] === 'cobblestone' && grid[4] === 'stick' && grid[7] === 'stick' && count === 5)) {
+      this.craftOutput3x3 = createItemStack('stone_axe', 1); return;
+    }
+    if ((grid[0] === 'iron_ingot' && grid[1] === 'iron_ingot' && grid[3] === 'iron_ingot' && grid[4] === 'stick' && grid[7] === 'stick' && count === 5) ||
+        (grid[1] === 'iron_ingot' && grid[2] === 'iron_ingot' && grid[5] === 'iron_ingot' && grid[4] === 'stick' && grid[7] === 'stick' && count === 5)) {
+      this.craftOutput3x3 = createItemStack('iron_axe', 1); return;
+    }
+    if ((grid[0] === 'diamond' && grid[1] === 'diamond' && grid[3] === 'diamond' && grid[4] === 'stick' && grid[7] === 'stick' && count === 5) ||
+        (grid[1] === 'diamond' && grid[2] === 'diamond' && grid[5] === 'diamond' && grid[4] === 'stick' && grid[7] === 'stick' && count === 5)) {
+      this.craftOutput3x3 = createItemStack('diamond_axe', 1); return;
+    }
+
+    // 5. Armor (Iron & Diamond)
+    // Helmet: 3 top row, 2 middle row sides
+    if (grid[0] === 'iron_ingot' && grid[1] === 'iron_ingot' && grid[2] === 'iron_ingot' && grid[3] === 'iron_ingot' && grid[5] === 'iron_ingot' && count === 5) {
+      this.craftOutput3x3 = createItemStack('iron_helmet', 1); return;
+    }
+    if (grid[0] === 'diamond' && grid[1] === 'diamond' && grid[2] === 'diamond' && grid[3] === 'diamond' && grid[5] === 'diamond' && count === 5) {
+      this.craftOutput3x3 = createItemStack('diamond_helmet', 1); return;
+    }
+    // Chestplate: all except top middle
+    if (grid[0] === 'iron_ingot' && grid[2] === 'iron_ingot' && grid[3] === 'iron_ingot' && grid[4] === 'iron_ingot' && grid[5] === 'iron_ingot' && grid[6] === 'iron_ingot' && grid[7] === 'iron_ingot' && grid[8] === 'iron_ingot' && count === 8) {
+      this.craftOutput3x3 = createItemStack('iron_chestplate', 1); return;
+    }
+    if (grid[0] === 'diamond' && grid[2] === 'diamond' && grid[3] === 'diamond' && grid[4] === 'diamond' && grid[5] === 'diamond' && grid[6] === 'diamond' && grid[7] === 'diamond' && grid[8] === 'diamond' && count === 8) {
+      this.craftOutput3x3 = createItemStack('diamond_chestplate', 1); return;
+    }
+    // Leggings: 3 top, 2 left column, 2 right column
+    if (grid[0] === 'iron_ingot' && grid[1] === 'iron_ingot' && grid[2] === 'iron_ingot' && grid[3] === 'iron_ingot' && grid[5] === 'iron_ingot' && grid[6] === 'iron_ingot' && grid[8] === 'iron_ingot' && count === 7) {
+      this.craftOutput3x3 = createItemStack('iron_leggings', 1); return;
+    }
+    if (grid[0] === 'diamond' && grid[1] === 'diamond' && grid[2] === 'diamond' && grid[3] === 'diamond' && grid[5] === 'diamond' && grid[6] === 'diamond' && grid[8] === 'diamond' && count === 7) {
+      this.craftOutput3x3 = createItemStack('diamond_leggings', 1); return;
+    }
+    // Boots: 2 left, 2 right
+    if (grid[0] === 'iron_ingot' && grid[2] === 'iron_ingot' && grid[3] === 'iron_ingot' && grid[5] === 'iron_ingot' && count === 4) {
+      this.craftOutput3x3 = createItemStack('iron_boots', 1); return;
+    }
+    if (grid[0] === 'diamond' && grid[2] === 'diamond' && grid[3] === 'diamond' && grid[5] === 'diamond' && count === 4) {
+      this.craftOutput3x3 = createItemStack('diamond_boots', 1); return;
+    }
+
+    // 6. Bow & Arrow
+    if (grid[1] === 'stick' && grid[3] === 'stick' && grid[7] === 'stick' && grid[2] === 'string' && grid[5] === 'string' && grid[8] === 'string' && count === 6) {
+      this.craftOutput3x3 = createItemStack('bow', 1); return;
+    }
+    if ((grid[1] === 'stone' || grid[1] === 'flint') && grid[4] === 'stick' && grid[7] === 'feather' && count === 3) {
+      this.craftOutput3x3 = createItemStack('arrow', 4); return;
+    }
+
+    // 7. TNT: 5 gunpowder + 4 sand
+    if (grid[0] === 'gunpowder' && grid[1] === 'sand' && grid[2] === 'gunpowder' && grid[3] === 'sand' && grid[4] === 'gunpowder' && grid[5] === 'sand' && grid[6] === 'gunpowder' && grid[7] === 'sand' && grid[8] === 'gunpowder' && count === 9) {
+      this.craftOutput3x3 = createItemStack('tnt', 1); return;
+    }
+
+    // 8. Golden Apple: 1 apple in center + 8 gold ingots around
+    if (grid[4] === 'apple' && grid[0] === 'gold_ingot' && grid[1] === 'gold_ingot' && grid[2] === 'gold_ingot' && grid[3] === 'gold_ingot' && grid[5] === 'gold_ingot' && grid[6] === 'gold_ingot' && grid[7] === 'gold_ingot' && grid[8] === 'gold_ingot' && count === 9) {
+      this.craftOutput3x3 = createItemStack('golden_apple', 1); return;
+    }
+
+    // 9. Furnace (8 Cobblestone ring)
+    if (grid[0] === 'cobblestone' && grid[1] === 'cobblestone' && grid[2] === 'cobblestone' && grid[3] === 'cobblestone' && grid[5] === 'cobblestone' && grid[6] === 'cobblestone' && grid[7] === 'cobblestone' && grid[8] === 'cobblestone' && count === 8) {
+      this.craftOutput3x3 = createItemStack('furnace', 1); return;
+    }
+
+    // 10. Chest (8 Planks ring)
+    if (grid[0] === 'oak_planks' && grid[1] === 'oak_planks' && grid[2] === 'oak_planks' && grid[3] === 'oak_planks' && grid[5] === 'oak_planks' && grid[6] === 'oak_planks' && grid[7] === 'oak_planks' && grid[8] === 'oak_planks' && count === 8) {
+      this.craftOutput3x3 = createItemStack('chest', 1); return;
+    }
+
+    // 11. Sticks
+    if (grid[4] === 'oak_planks' && grid[7] === 'oak_planks' && count === 2) {
+      this.craftOutput3x3 = createItemStack('stick', 4); return;
+    }
+
+    // 12. Torches
+    if (grid[4] === 'coal' && grid[7] === 'stick' && count === 2) {
+      this.craftOutput3x3 = createItemStack('torch', 4); return;
+    }
+
+    this.craftOutput3x3 = null;
+  }
+
+  // =========================================================================
+  // FURNACE SMELTING SYSTEM
+  // =========================================================================
+
+  private initFurnaceUI(): void {
+    // Initial bindings for furnace
+  }
+
+  public drawFurnaceSlots(): void {
+    const storageGrid = document.getElementById('furnace-slots-grid');
+    const hotbarGrid = document.getElementById('furnace-hotbar-grid');
+    if (!storageGrid || !hotbarGrid || !this.game.player) return;
+
+    storageGrid.innerHTML = '';
+    hotbarGrid.innerHTML = '';
+
+    for (let i = 9; i < 45; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'hotbar-slot';
+      this.renderSlotItem(slot, this.game.player.inventory.getItem(i));
+      slot.addEventListener('click', () => {
+        this.handleSlotClick(i);
+        this.drawFurnaceSlots();
+      });
+      storageGrid.appendChild(slot);
+    }
+
+    for (let i = 0; i < 9; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'hotbar-slot';
+      this.renderSlotItem(slot, this.game.player.inventory.getItem(i));
+      slot.addEventListener('click', () => {
+        this.handleSlotClick(i);
+        this.drawFurnaceSlots();
+      });
+      hotbarGrid.appendChild(slot);
+    }
+
+    // Input Slot
+    const inputSlot = document.getElementById('furnace-input-slot')!;
+    this.renderSlotItem(inputSlot, this.furnaceInput);
+    const newInput = inputSlot.cloneNode(true);
+    inputSlot.parentNode!.replaceChild(newInput, inputSlot);
+    newInput.addEventListener('click', () => {
+      this.handleFurnaceSlotClick('input');
+      this.drawFurnaceSlots();
+    });
+
+    // Fuel Slot
+    const fuelSlot = document.getElementById('furnace-fuel-slot')!;
+    this.renderSlotItem(fuelSlot, this.furnaceFuel);
+    const newFuel = fuelSlot.cloneNode(true);
+    fuelSlot.parentNode!.replaceChild(newFuel, fuelSlot);
+    newFuel.addEventListener('click', () => {
+      this.handleFurnaceSlotClick('fuel');
+      this.drawFurnaceSlots();
+    });
+
+    // Output Slot
+    const outputSlot = document.getElementById('furnace-output-slot')!;
+    this.renderSlotItem(outputSlot, this.furnaceOutput);
+    const newOutput = outputSlot.cloneNode(true);
+    outputSlot.parentNode!.replaceChild(newOutput, outputSlot);
+    newOutput.addEventListener('click', () => {
+      this.handleFurnaceSlotClick('output');
+      this.drawFurnaceSlots();
+    });
+  }
+
+  private handleFurnaceSlotClick(type: 'input' | 'fuel' | 'output'): void {
+    if (type === 'input') {
+      if (!this.heldItem) {
+        this.heldItem = this.furnaceInput;
+        this.furnaceInput = null;
+      } else {
+        if (!this.furnaceInput) {
+          this.furnaceInput = this.heldItem;
+          this.heldItem = null;
+        } else if (this.furnaceInput.id === this.heldItem.id) {
+          this.furnaceInput.count += this.heldItem.count;
+          this.heldItem = null;
+        } else {
+          const temp = this.furnaceInput;
+          this.furnaceInput = this.heldItem;
+          this.heldItem = temp;
+        }
+      }
+    } else if (type === 'fuel') {
+      if (!this.heldItem) {
+        this.heldItem = this.furnaceFuel;
+        this.furnaceFuel = null;
+      } else {
+        if (!this.furnaceFuel) {
+          this.furnaceFuel = this.heldItem;
+          this.heldItem = null;
+        } else if (this.furnaceFuel.id === this.heldItem.id) {
+          this.furnaceFuel.count += this.heldItem.count;
+          this.heldItem = null;
+        } else {
+          const temp = this.furnaceFuel;
+          this.furnaceFuel = this.heldItem;
+          this.heldItem = temp;
+        }
+      }
+    } else if (type === 'output') {
+      if (this.furnaceOutput && !this.heldItem) {
+        this.heldItem = this.furnaceOutput;
+        this.furnaceOutput = null;
+      }
+    }
+    this.updateCursorElement();
+  }
+
+  private tickFurnace(deltaSec: number): void {
+    const SMELT_RECIPES: { [key: string]: string } = {
+      'raw_iron': 'iron_ingot',
+      'raw_gold': 'gold_ingot',
+      'cobblestone': 'stone',
+      'sand': 'glass',
+      'clay': 'terracotta',
+      'cooked_beef': 'cooked_beef'
+    };
+
+    if (!this.furnaceInput || !SMELT_RECIPES[this.furnaceInput.id]) {
+      this.furnaceCookProgress = 0;
+      return;
+    }
+
+    const outputResultId = SMELT_RECIPES[this.furnaceInput.id];
+
+    // Check if output slot can receive result
+    if (this.furnaceOutput && (this.furnaceOutput.id !== outputResultId || this.furnaceOutput.count >= 64)) {
+      return;
+    }
+
+    // Burn Fuel
+    if (this.furnaceBurnTimer <= 0) {
+      if (this.furnaceFuel && this.furnaceFuel.count > 0) {
+        let burnGain = 4.0;
+        if (this.furnaceFuel.id === 'coal') burnGain = 16.0;
+        else if (this.furnaceFuel.id === 'oak_log' || this.furnaceFuel.id === 'acacia_log') burnGain = 8.0;
+        else if (this.furnaceFuel.id === 'oak_planks') burnGain = 6.0;
+
+        this.furnaceBurnTimer = burnGain;
+        this.furnaceFuel.count--;
+        if (this.furnaceFuel.count <= 0) this.furnaceFuel = null;
+      } else {
+        return; // No fuel to smelt
+      }
+    }
+
+    this.furnaceBurnTimer -= deltaSec;
+    this.furnaceCookProgress += deltaSec;
+
+    // Complete Smelt (4 seconds per item)
+    if (this.furnaceCookProgress >= 4.0) {
+      this.furnaceCookProgress = 0;
+      this.furnaceInput.count--;
+      if (this.furnaceInput.count <= 0) this.furnaceInput = null;
+
+      if (!this.furnaceOutput) {
+        this.furnaceOutput = createItemStack(outputResultId, 1);
+      } else {
+        this.furnaceOutput.count++;
+      }
+
+      if (this.activeScreen === this.screens.furnaceScreen) {
+        this.drawFurnaceSlots();
+      }
+    }
   }
 }

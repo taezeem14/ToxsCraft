@@ -23,6 +23,9 @@
   <!-- Crosshair Overlay -->
   <div id="crosshair"></div>
 
+  <!-- Damage Flash Screen Vignette -->
+  <div id="damage-vignette" class="damage-vignette"></div>
+
   <!-- HUD Interface -->
   <div id="hud-overlay" class="ui-screen hidden">
     <!-- Top-Center Utility Bar -->
@@ -66,17 +69,24 @@
       <div>XYZ: <span id="coords-val">0.0, 80.0, 0.0</span></div>
       <div>Chunk: <span id="chunk-val">0, 0</span></div>
       <div>Biome: <span id="biome-val">Plains</span></div>
+      <div>Weather: <span id="weather-val">Clear</span></div>
       <div>Time: <span id="time-val">08:00 AM</span></div>
     </div>
 
     <!-- Center notifications toast -->
     <div id="toast-container"></div>
 
-    <!-- Status bars (Hearts, Hunger, Hotbar) -->
+    <!-- Status bars (Armor, Hearts, Oxygen, Hunger, Hotbar) -->
     <div class="hud-bottom">
-      <div class="hud-status-bars">
-        <div id="health-bar" class="status-row"></div>
-        <div id="hunger-bar" class="status-row text-right"></div>
+      <div class="hud-status-bars-wrapper">
+        <div class="hud-status-bars secondary-row">
+          <div id="armor-bar" class="status-row"></div>
+          <div id="oxygen-bar" class="status-row text-right hidden"></div>
+        </div>
+        <div class="hud-status-bars">
+          <div id="health-bar" class="status-row"></div>
+          <div id="hunger-bar" class="status-row text-right"></div>
+        </div>
       </div>
       
       <!-- XP Bar & Level -->
@@ -357,6 +367,82 @@
             <div class="craft-arrow">→</div>
             <div id="crafting-output" class="craft-slot output"></div>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3x3 Crafting Table Modal Screen -->
+  <div id="crafting-table-screen" class="ui-screen inventory-container hidden">
+    <div class="inventory-card">
+      <div class="inventory-header">
+        <h2>Crafting Table (3x3)</h2>
+        <button id="btn-close-crafting-table" class="close-btn">×</button>
+      </div>
+      
+      <div class="inventory-layout">
+        <!-- 3x3 Crafting Grid Area -->
+        <div class="inventory-crafting-section wide">
+          <h3>Crafting Grid</h3>
+          <div class="crafting-block craft-3x3-block">
+            <div id="crafting-grid-3x3" class="craft-grid-3x3">
+              <div class="craft-slot" data-c3-index="0"></div>
+              <div class="craft-slot" data-c3-index="1"></div>
+              <div class="craft-slot" data-c3-index="2"></div>
+              <div class="craft-slot" data-c3-index="3"></div>
+              <div class="craft-slot" data-c3-index="4"></div>
+              <div class="craft-slot" data-c3-index="5"></div>
+              <div class="craft-slot" data-c3-index="6"></div>
+              <div class="craft-slot" data-c3-index="7"></div>
+              <div class="craft-slot" data-c3-index="8"></div>
+            </div>
+            <div class="craft-arrow">➔</div>
+            <div id="crafting-table-output" class="craft-slot output"></div>
+          </div>
+        </div>
+
+        <!-- Storage and Hotbar Slots -->
+        <div class="inventory-main-section">
+          <h3>Storage</h3>
+          <div id="crafting-table-slots-grid" class="slots-grid"></div>
+          <h3>Hotbar</h3>
+          <div id="crafting-table-hotbar-grid" class="slots-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Furnace Smelting Modal Screen -->
+  <div id="furnace-screen" class="ui-screen inventory-container hidden">
+    <div class="inventory-card">
+      <div class="inventory-header">
+        <h2>Furnace Smelter</h2>
+        <button id="btn-close-furnace" class="close-btn">×</button>
+      </div>
+      
+      <div class="inventory-layout">
+        <div class="inventory-crafting-section wide">
+          <h3>Smelting</h3>
+          <div class="furnace-smelting-area">
+            <div class="furnace-grid">
+              <div id="furnace-input-slot" class="craft-slot" title="Material to smelt (Iron/Gold ore, Sand, Cobblestone, Raw Meat)"></div>
+              <div class="furnace-flame-container">
+                <div id="furnace-flame" class="furnace-flame">🔥</div>
+              </div>
+              <div id="furnace-fuel-slot" class="craft-slot" title="Fuel (Coal, Planks, Logs, Sticks)"></div>
+            </div>
+            <div class="furnace-progress-arrow">
+              <div id="furnace-progress-fill" class="furnace-progress-fill">➔</div>
+            </div>
+            <div id="furnace-output-slot" class="craft-slot output" title="Smelted Output Item"></div>
+          </div>
+        </div>
+
+        <div class="inventory-main-section">
+          <h3>Storage</h3>
+          <div id="furnace-slots-grid" class="slots-grid"></div>
+          <h3>Hotbar</h3>
+          <div id="furnace-hotbar-grid" class="slots-grid"></div>
         </div>
       </div>
     </div>

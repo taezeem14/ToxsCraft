@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import { CHUNK_SIZE } from '../constants';
 import { AssetLoader } from '../core/AssetLoader';
 import { SkySystem } from './SkySystem';
+import { ViewModel } from './ViewModel';
+import { ParticleSystem } from './ParticleSystem';
 import { settingsManager } from '../core/SettingsManager';
 import blockVertShader from './shaders/block.vert.glsl';
 import blockFragShader from './shaders/block.frag.glsl';
@@ -25,6 +27,12 @@ export class Renderer {
   public dirLight!: THREE.DirectionalLight;
   public ambientLight!: THREE.AmbientLight;
   public skySystem!: SkySystem;
+  public viewModel!: ViewModel;
+  public particleSystem!: ParticleSystem;
+
+  // Screen shake
+  private screenShakeIntensity = 0;
+  private screenShakeDuration = 0;
 
   // Materials
   private blockMaterial!: THREE.ShaderMaterial;
@@ -75,6 +83,8 @@ export class Renderer {
     // Scaffolding components
     this.initLights();
     this.initMaterials();
+    this.viewModel = new ViewModel(this.scene);
+    this.particleSystem = new ParticleSystem(this.scene);
     
     window.addEventListener('resize', this.onWindowResize);
   }
@@ -299,11 +309,29 @@ export class Renderer {
     }
   }
 
-  public render(timeOfDay: number, playerPos: THREE.Vector3, gameTime: number, isNether = false, deltaSec = 0.016): void {
+  public addScreenShake(intensity = 0.25, duration = 0.35): void {
+    this.screenShakeIntensity = Math.max(this.screenShakeIntensity, intensity);
+    this.screenShakeDuration = Math.max(this.screenShakeDuration, duration);
+  }
+
+  public render(
+    timeOfDay: number,
+    playerPos: THREE.Vector3,
+    gameTime: number,
+    isNether = false,
+    deltaSec = 0.016,
+    isUnderwater = false,
+    lightningIntensity = 0,
+    skyDarkness = 0
+  ): void {
     let fogColor: THREE.Color;
     let sunIntensity: number;
 
-    if (isNether) {
+    if (isUnderwater) {
+      fogColor = new THREE.Color(0.04, 0.22, 0.42); // Deep crystal underwater blue
+      this.scene.fog = new THREE.FogExp2(fogColor, 0.035);
+      sunIntensity = 0.5;
+    } else if (isNether) {
       this.skySystem.setDimension('nether');
       fogColor = new THREE.Color(0.12, 0.03, 0.03); // Dark red Nether fog
       this.scene.fog = new THREE.FogExp2(fogColor, 0.015); // High density cavern fog
@@ -313,8 +341,19 @@ export class Renderer {
       // 1. Update Sky elements
       this.skySystem.update(timeOfDay, playerPos);
       fogColor = this.skySystem.getFogColor();
-      this.scene.fog = new THREE.FogExp2(fogColor, 0.0035);
-      sunIntensity = this.skySystem.getSunlightIntensity();
+      
+      // Apply storm sky darkness
+      if (skyDarkness > 0) {
+        fogColor.lerp(new THREE.Color(0.15, 0.17, 0.22), skyDarkness);
+      }
+
+      // Apply lightning flash to fog
+      if (lightningIntensity > 0) {
+        fogColor.lerp(new THREE.Color(0.9, 0.95, 1.0), Math.min(1.0, lightningIntensity * 0.5));
+      }
+
+      this.scene.fog = new THREE.FogExp2(fogColor, 0.0035 + skyDarkness * 0.002);
+      sunIntensity = Math.max(0.05, this.skySystem.getSunlightIntensity() * (1.0 - skyDarkness * 0.6) + lightningIntensity * 1.5);
     }
 
     this.renderer.setClearColor(fogColor);
@@ -339,8 +378,37 @@ export class Renderer {
       this.dirLight.shadow.camera.lookAt(playerPos);
     }
 
+    // Apply Screen Shake if active
+    let shakeOffsetX = 0;
+    let shakeOffsetY = 0;
+    let shakeOffsetZ = 0;
+
+    if (this.screenShakeDuration > 0) {
+      this.screenShakeDuration -= deltaSec;
+      const factor = Math.min(1.0, this.screenShakeDuration / 0.35);
+      const amp = this.screenShakeIntensity * factor;
+      shakeOffsetX = (Math.random() - 0.5) * amp;
+      shakeOffsetY = (Math.random() - 0.5) * amp;
+      shakeOffsetZ = (Math.random() - 0.5) * amp;
+
+      this.camera.position.x += shakeOffsetX;
+      this.camera.position.y += shakeOffsetY;
+      this.camera.position.z += shakeOffsetZ;
+
+      if (this.screenShakeDuration <= 0) {
+        this.screenShakeIntensity = 0;
+      }
+    }
+
     // Render main scene pass
     this.renderer.render(this.scene, this.camera);
+
+    // Restore camera position from shake offset
+    if (shakeOffsetX !== 0 || shakeOffsetY !== 0 || shakeOffsetZ !== 0) {
+      this.camera.position.x -= shakeOffsetX;
+      this.camera.position.y -= shakeOffsetY;
+      this.camera.position.z -= shakeOffsetZ;
+    }
   }
 
   public setShadowsEnabled(enabled: boolean): void {
@@ -727,6 +795,12 @@ export class Renderer {
     if (this.playerGroup) {
       this.scene.remove(this.playerGroup);
       this.playerGroup = null;
+    }
+    if (this.viewModel) {
+      this.viewModel.clear();
+    }
+    if (this.particleSystem) {
+      this.particleSystem.clear();
     }
     window.removeEventListener('resize', this.onWindowResize);
     this.renderer.dispose();
