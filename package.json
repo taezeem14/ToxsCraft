@@ -16,6 +16,7 @@
     "three": "^0.160.0"
   },
   "devDependencies": {
+    "@rollup/pluginutils": "^5.1.0",
     "@types/howler": "^2.2.11",
     "@types/three": "^0.160.0",
     "typescript": "^5.3.3",
