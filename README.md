@@ -10,203 +10,175 @@
 <div align="center">
 
 # 🪨 Tox'sCraft 🌲
+### *The Ultimate WebGL Voxel Sandbox Survival Game*
 
-> **The voxel game that's absolutely bussin. No cap, no downloads, no BS — just vibes and blocks in your browser.**
+> **No downloads. No launchers. Pure vibes, 3D animated viewmodels, procedural weather, explosive TNT, and survival crafting directly in your browser.**
 
 [![Three.js](https://img.shields.io/badge/Three.js-r160+-black?style=for-the-badge&logo=threedotjs&logoColor=white)](https://threejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-Blazing_Fast-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+[![WebGL](https://img.shields.io/badge/WebGL-Optimized_128MB_iGPU-990000?style=for-the-badge&logo=webgl&logoColor=white)](https://www.khronos.org/webgl/)
 [![Vercel](https://img.shields.io/badge/Vercel-Deploy_Ready-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/)
-[![Firebase](https://img.shields.io/badge/Firebase-Serverless-ffca28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com/)
-[![WebGL](https://img.shields.io/badge/WebGL-Powered-990000?style=for-the-badge&logo=webgl&logoColor=white)](https://www.khronos.org/webgl/)
 [![License](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](./LICENSE)
 
 </div>
 
 ---
 
-## ✨ What Even Is This? (No Cap Edition)
+## ✨ What Is Tox'sCraft?
 
-Tox'sCraft is a **Minecraft-inspired 3D voxel sandbox survival game** that runs *entirely in your browser* — zero installs, zero launchers, zero waiting. It's giving **main character energy** with a full-blown procedurally generated open world, hostile mobs, crafting, achievements, and an XP system that goes *stupid* hard.
+Tox'sCraft is a **full-featured, high-performance 3D voxel sandbox survival game** built from scratch with **TypeScript, Three.js, and WebGL**. It runs seamlessly on any modern web browser — from high-end gaming rigs down to **128MB integrated GPUs (Intel HD / UHD / Iris / Mobile)**.
 
-Built from the ground up with **TypeScript + Three.js + custom GLSL shaders**, this isn't some janky hobbyist project — it's a **production-grade W game** that you can flex in your portfolio, self-host for free on Vercel, and run on hardware so old your grandma probably donated it. We're talking **Compaq Presario era** compatible, bestie. 🖥️
-
-Minecraft who? We don't know her. 💅
+Featuring procedural infinite world generation across 11+ biomes, first-person 3D animated viewmodels, GPU particle physics, dynamic weather cycles, interactive TNT explosions, 3x3 crafting tables, furnace smelting, ranged archery, and an extensive Web Audio synthesizer.
 
 ---
 
-## 🔥 Features (Sheesh, We Really Cooked)
+## 🔥 Key Features & Systems
 
-### 🌍 Procedural World Generation — *It's giving infinite possibilities*
-Over **10+ unique biomes** procedurally generated with seeded simplex noise. Every world is different, every run hits different. Biomes blend with smooth HSL fog transitions so the vibe is always immaculate.
+### 🦾 1st-Person 3D Animated ViewModel
+- **Custom Player Arm & Skin Mapping**: Renders Steve, Alex, Tox, Cyber, Knight, Mage, Zombie, and Skeleton skin textures directly in first-person view.
+- **3D Item & Block Miniatures**: Handheld blocks render as textured 3D voxel cubes with atlas UVs; tools display miniature 3D geometries.
+- **Procedural Animations**: Realistic mining swing arcs, block placement punches, eating food wiggles, bow drawing tension, and walking/sprinting sinusoidal bobbing.
 
-### ⛏️ Mining & Crafting — *The classic W gameplay loop*
-Break blocks, collect resources, craft tools. A **2×2 crafting grid** with recipe resolution means you go from punching trees to building empires in no time. Logs → Planks → Sticks → Torches. We love to see it.
+### 💥 GPU Particle Physics Engine
+- **Single-Draw-Call Instanced Rendering**: Ultra-low overhead particle simulation.
+- **Voxel Debris**: 16 fragments with gravity and momentum on block break.
+- **Combat VFX**: Golden sparkle bursts on critical jump hits, hit sparks, and death poofs.
+- **Explosion Shockwaves**: Expanding smoke clouds, fire shards, and dynamic blast radius particles.
+- **Atmospheric Precipitation**: Real-time localized rain streaks and drifting snow particles.
 
-### 🧟 8 Mob Types — *The streets are NOT safe after dark*
-Survive the night against a full roster of hostile and passive creatures:
-- 🧟 **Zombies** — slow but they're coming for you, respectfully
-- 💥 **Creepers** — they're right behind you. Don't look.
-- 💀 **Skeletons** — ranged attackers that lowkey have drip
-- 🕷️ **Spiders** — climbing walls and not paying rent
-- 🟩 **Slimes** — bouncy lil fellas with big energy
-- 🐔 **Chickens** — passive, vibing, no thoughts
-- 🐄 **Cows** — mooving differently
-- 🐷 **Pigs** — the OG homies of the pasture
+### ⛈️ Dynamic Weather & Atmosphere
+- **Weather State Machine**: Transitions between **Clear**, **Rain**, **Thunderstorm**, and **Snow**.
+- **Biome Temperature Sensitivity**: Precipitates snow in Tundra/Snowy biomes, rain in Forests/Plains, and suppresses precipitation in Deserts and Badlands.
+- **Sky Darkening & Lightning**: Smooth sunlight attenuation during storms with bright lightning flashes and synthesized thunder.
 
-### 🏆 Achievement System — *Slay your goals*
-Get clout for your in-game accomplishments. The achievement system tracks your milestones and serves them up with that dopamine hit you came here for. W game behavior.
+### 💣 Interactive Primed TNT & Explosions
+- **Physics Ignition**: Right-click placed TNT blocks or use Flint & Steel to ignite.
+- **Swell & White Flash Fuse**: 3-second fuse with white-swelling animation and hissing audio.
+- **Spherical Voxel Craters**: Destroys surrounding soft blocks within a 4-block spherical radius (preserves Bedrock and Obsidian).
+- **Shockwave Physics**: Applies velocity knockback, damage, and camera screen shake to players and mobs.
 
-### 📈 XP & Level Progression — *Glow up arc incoming*
-Every block mined, every mob slain, every craft completed — it's all feeding your XP bar. Level up, get stronger, become the main character. The grind never stops. 💪
+### 🪓 3×3 Crafting Table & 2×2 Inventory Crafting
+- **Interactive 3×3 Modal GUI**: Right-click placed Crafting Tables to open the full crafting screen.
+- **Comprehensive Recipe Book**:
+  - **Tools & Weapons**: Pickaxes, Swords, Axes, Shovels (Wood, Stone, Iron, Diamond).
+  - **Armor Sets**: Helmets, Chestplates, Leggings, Boots.
+  - **Ranged & Survival**: Bows, Arrows, TNT, Torches, Furnaces, Chests, Golden Apples, Bread.
 
-### 🌅 Dynamic Day/Night Cycle — *Different vibes, different times*
-A fully animated celestial dome with Sun and Moon orbits, Rayleigh sky gradients, and star clouds that fade at sunrise. Daytime? Bussin, collect resources. Nighttime? It's giving horror movie energy. 😰
+### 🔥 Furnace Smelting Engine
+- **Smelting GUI**: Input slot, fuel slot, animated flame gauge, and output collector.
+- **Smelting Recipes**: Raw Iron/Gold into Ingots, Sand into Glass, Cobblestone into Stone, Clay into Terracotta, Raw Meats into Cooked Steaks/Porkchops.
+- **Fuel Economy**: Coal (16s), Logs (8s), Planks (6s), and Sticks (4s).
 
-### 💾 IndexedDB Save System — *Your builds are safe, bestie*
-Full world persistence via IndexedDB. Your builds, your progress, your legacy — autosaved locally so you never have to relive the trauma of losing a world. We been through enough.
+### 🏹 Bow & Arrow Ranged Combat
+- **Ballistic Physics**: Fires aerodynamic arrows with gravity trajectories and velocity momentum.
+- **Mob Piercing**: Registers hit damage, knockback, and critical damage on mobs.
 
-### 📱 Old Hardware Compatible — *Runs on your grandpa's PC*
-Optimized with **greedy meshing** that culls ~90% of unnecessary triangles, and custom AABB physics that keeps frame times smooth. If your machine can run a browser, it can run Tox'sCraft. Compaq Presario era? Step up. 🖥️
+### 🛡️ Survival HUD & Audio Synthesizer
+- **Armor Bar**: 10 dynamic shields displaying equipped defense points.
+- **Oxygen Bubble Bar**: Submersion detector with 10 bubbles and drowning damage.
+- **Tool Durability Meters**: In-slot health bars (Green $\rightarrow$ Yellow $\rightarrow$ Red).
+- **Damage Screen Vignette**: Red pulse effect on player hurt.
+- **25+ Procedural Web Audio Synthesizers**: Real-time sound synthesis for footsteps, digging, tool breaks, weapon sweeps, crits, eating, explosions, thunder, and mob noises (Cow, Pig, Zombie, Skeleton, Creeper, Spider, Chicken, Slime).
 
-### 🎮 WebGL Powered — *No install? No problem*
-Zero downloads. Zero launchers. Just open a URL and you're IN. WebGL rendering directly in your browser tab. The accessibility is unmatched and the vibes are immaculate.
+### ⚡ 128MB iGPU & Low-End Optimization
+- **Zero-GC Render Loops**: Pooled static scratch vectors and colors to eliminate garbage collection frame stalls.
+- **Front-Side Culling**: Halved triangle rasterization load for opaque blocks.
+- **$O(1)$ Swap-and-Pop Particles**: Eliminates $O(n^2)$ array shifts during large explosions.
+- **Dirty Chunk Saving**: Prevents massive IndexedDB disk freezes by saving only modified chunks.
+- **Hardware Auto-Detection**: Automatically detects Intel HD/UHD/Iris/Mali/Adreno and adjusts render distance for smooth 60 FPS.
 
 ---
 
-## 🕹️ How To Play — *Controls that slap*
+## 🕹️ Controls & Keybindings
 
 | Key / Input | Action |
 |---|---|
-| `W` `A` `S` `D` | Move like the main character you are |
-| `Mouse Move` | Look around (Pointer Lock activated bestie) |
+| `W` `A` `S` `D` | Move (Walk / Sprint) |
+| `Mouse Move` | Look around (Pointer Lock) |
 | `Space` | Jump / Swim Up / Fly Up ✈️ |
 | `Shift` | Sneak / Fly Down |
-| `Double-tap Space` | Toggle Flying mode (Creative mode activated fr fr) |
-| `Left Click` | Mine / Break targeted block (hold to crunch) ⛏️ |
-| `Right Click` | Place block / Interact with the world |
-| `E` | Toggle Inventory & Crafting Screen 🎒 |
-| `1`–`9` / Scroll Wheel | Select hotbar slot |
-| `Escape` | Pause / Settings Menu |
-
-> [!TIP]
-> Double-tap `Space` to activate fly mode and get that aerial main character POV. The world gen looks *insane* from up high. 🌄
+| `Double-tap Space` | Toggle Creative Flying Mode |
+| `Left Click` | Mine Block / Attack Mob / Swing Tool ⛏️ |
+| `Right Click` | Place Block / Interact (Crafting Table, Furnace) / Shoot Bow / Eat Food |
+| `E` | Open Inventory / Close Open Modals 🎒 |
+| `1`–`9` / Scroll Wheel | Select Hotbar Slot |
+| `Escape` | Pause Menu / Settings |
 
 ---
 
-## 🗺️ Biomes — *The map is actually popping*
+## 🗺️ Biomes (11 Unique Biomes)
 
-Tox'sCraft generates **11 distinct biomes**, each with unique terrain height, block palette, and mob spawn rates. Your world tour:
-
-| Biome | Vibe Check | What to Expect |
+| Biome | Description | Block Palette |
 |---|---|---|
-| 🟩 **Plains** | Starter territory, chill | Flat land, easy resources, the tutorial zone |
-| 🌲 **Forest** | Cozy and green | Trees on trees on trees. Wood? Stacked. |
-| 🏜️ **Desert** | Hot girl summer (literally) | Sand, cacti, no water. Touch grass elsewhere. |
-| ❄️ **Tundra** | It's giving Frozen | Snow-covered hills, limited resources, cold vibes |
-| 🌊 **Ocean** | Aquatic arc unlocked | Endless water, hidden ocean floors, swim check |
-| 🌿 **Jungle** | Main character tropical trip | Dense foliage, tall trees, peak aesthetic |
-| ⛰️ **Mountains** | High altitude, high stakes | Steep terrain, exposed ores, breathtaking views |
-| 🌾 **Swamp** | Dark academia energy | Murky, atmospheric, mob heavy after dark |
-| 🦁 **Savanna** | Safari szn | Warm tones, flat acacia terrain, open skies |
-| 🔴 **Badlands** | Chaos terrain, W aesthetic | Red mesa cliffs, rare gold, absolutely unhinged terrain |
-| 🍄 **Mushroom Island** | Rare drop, legendary biome | Giant mushrooms, mycelium, zero hostile mobs. Paradise. |
+| 🟩 **Plains** | Open rolling grasslands | Grass, Dirt, Flowers |
+| 🌲 **Forest** | Dense tree canopies | Oak Logs, Leaves, Grass |
+| 🏜️ **Desert** | Arid dunes with cacti | Sand, Sandstone, Cacti |
+| ❄️ **Tundra** | Freezing snowfields | Snow, Ice, Dirt |
+| 🌊 **Ocean** | Deep bodies of water | Water, Sand, Gravel |
+| 🌿 **Jungle** | Massive tropical rainforests | Jungle Wood, Vines, Leaves |
+| ⛰️ **Mountains** | Towering stone peaks | Stone, Snow, Exposed Ores |
+| 🌾 **Swamp** | Murky wetlands | Mud, Oak, Water Lilies |
+| 🦁 **Savanna** | Flat acacia plains | Acacia Wood, Dry Grass |
+| 🔴 **Badlands** | Terracotta canyons | Terracotta, Red Sand, Gold |
+| 🍄 **Mushroom Island** | Rare peaceful sanctuary | Mycelium, Huge Mushrooms |
 
 ---
 
-## 🛠️ Tech Stack — *Lowkey Stacked, No Cap*
+## 🛠️ Tech Stack
 
-| Layer | Tech | The W Reason |
+| Layer | Technology | Details |
 |---|---|---|
-| 🖼️ **Core Renderer** | [Three.js](https://threejs.org/) r160+ | WebGL wrapper that genuinely carries the whole rendering pipeline |
-| 🔷 **Language** | [TypeScript](https://www.typescriptlang.org/) (strict mode) | Type-safe, autocomplete-blessed, no runtime mystery errors |
-| ⚡ **Bundler** | [Vite](https://vitejs.dev/) | Instant HMR, lightning builds, and it just *works* |
-| 🏔️ **Terrain Noise** | [simplex-noise](https://github.com/jwagner/simplex-noise) | Seeded heightmaps + caves + biome blending that goes hard |
-| 💾 **Persistence** | IndexedDB (`idb`) | Chunked world autosaves stored locally. Your builds = eternal. |
-| 🌐 **Multiplayer & Auth** | Firebase Realtime DB & Auth | Serverless player syncing + Google Sign-In (100% Free architecture) |
-| 🔊 **Audio** | Web Audio API | Pentatonic soundscapes + block SFX synthesized in real-time |
-| 🎨 **Shaders** | Custom GLSL (Vert/Frag) | Ambient occlusion, waving water, glowing lava — pure drip |
-| 🧱 **Physics** | Custom Sweep AABB | Zero clipping, buttery smooth collision resolution |
-| 🚀 **Hosting** | [Vercel](https://vercel.com/) | 100% Free static frontend web hosting + global CDN with auto-deployment from Git |
+| 🖼️ **3D Renderer** | [Three.js](https://threejs.org/) (WebGL) | Custom greedy meshing, viewmodel rigging, instanced particles |
+| 🔷 **Language** | [TypeScript](https://www.typescriptlang.org/) | Strict mode, zero `any` types, fully typed ECS architecture |
+| ⚡ **Bundler** | [Vite](https://vitejs.dev/) | Instant HMR and optimized production bundling |
+| 🏔️ **Terrain Gen** | [simplex-noise](https://github.com/jwagner/simplex-noise) | Seeded 3D simplex noise with 3D cave tunnels |
+| 💾 **Persistence** | IndexedDB (`idb`) | Incremental dirty chunk autosaving |
+| 🔊 **Audio** | Web Audio API | 100% procedural sound synthesis (no external audio files) |
+| 🚀 **Hosting** | [Vercel](https://vercel.com/) | 100% free static frontend deployment with global CDN |
 
 ---
 
-## 💻 Self-Host / Development — *Run It Locally, Bestie*
-
-> [!IMPORTANT]
-> You'll need **Node.js v20+** and **pnpm** installed before you proceed. Don't skip prerequisites or you'll be in your feelings.
+## 💻 Local Development & Setup
 
 ### Prerequisites
+- **Node.js** v20+
+- **npm** or **pnpm**
 
 ```bash
-# Check your Node version (needs v20+)
-node --version
-
-# Install pnpm if you don't have it (it's the superior package manager fr)
-npm install -g pnpm
-```
-
-### Clone & Install
-
-```bash
-# 1. Clone the repo
+# 1. Clone the repository
 git clone https://github.com/taezeem14/ToxsCraft.git
 cd ToxsCraft
 
-# 2. Install dependencies (pnpm goes brrr 🚀)
-pnpm install
+# 2. Install dependencies
+npm install
 
-# 3. Fire up the dev server
-pnpm dev
+# 3. Start development server
+npm run dev
 ```
 
-Then open `http://localhost:3000` in Chrome or Firefox and **let's cook** 🍳
+Open `http://localhost:3000` in your browser and start playing!
 
-### Extra Scripts
-
+### Build for Production
 ```bash
-# Type-check everything (no sneaky TS errors allowed)
-npx tsc --noEmit
+# Verify TypeScript types and generate production bundle
+npm run build
 
-# Build for production (optimized, minified, ready to ship)
-pnpm build
-
-# Preview the production build locally
-pnpm preview
+# Preview production build locally
+npm run preview
 ```
-
-> [!NOTE]
-> Chrome is the GOAT browser for WebGL performance here. Firefox works too. Safari is... trying its best. 🙏
 
 ---
 
-## 🚀 Deploy to Vercel — *100% Free Static Hosting*
-
-Tox'sCraft is fully optimized for **Vercel** static deployment. It is 100% free of charge:
+## 🚀 Deploy to Vercel
 
 1. Push your changes to the `main` branch of your GitHub repository.
-2. Link your GitHub repository to Vercel.
-3. Vercel will automatically build (`pnpm run build` with output directory `dist`) and deploy the game on every commit.
-4. Your game will be live in seconds at `https://<your-project>.vercel.app`! 🌐✨
+2. Import the project into [Vercel](https://vercel.com).
+3. Set the build command to `npm run build` and output directory to `dist`.
+4. Deploy! Your game will be live with full HTTPS and CDN caching.
 
 ---
 
-## 📋 Survival Mechanics — *The Grind Is Real*
+## 📜 License
 
-Because Tox'sCraft doesn't play around with the survival loop:
-
-- ❤️ **Health** — Take damage from mobs, lava, falling, and drowning. Regen when fed.
-- 🍗 **Hunger** — Stay fed or your health regen stops. The streets demand respect.
-- 🏃 **Stamina** — Sprint depletes it. Sneak when you're running low.
-- 💀 **Fall Damage** — Touch grass carefully. Gravity is real and it doesn't care about you.
-- 🌊 **Drowning** — You have an air bar. Use it wisely.
-- 🔥 **Lava Burning** — It will end you. Immediately. No discussion.
-- 💎 **Ore Mining** — Coal, Iron, Gold, Redstone, Lapis, Diamond, Emerald. Go deep, get rich.
-
----
-
-## 📜 License & Credits — *Respect the homies*
-
-**MIT License** — take it, fork it, build on it, just don't be weird about it. ✌️
-
----
+This project is licensed under the **MIT License** — see the [LICENSE](./LICENSE) file for details.
