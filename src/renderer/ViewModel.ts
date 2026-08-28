@@ -103,6 +103,13 @@ export class ViewModel {
   public setSkin(skinName: string): void {
     if (this.currentSkin !== skinName) {
       this.currentSkin = skinName;
+      if (this.armMesh.material) {
+        if (Array.isArray(this.armMesh.material)) {
+          this.armMesh.material.forEach(m => m.dispose());
+        } else {
+          (this.armMesh.material as THREE.Material).dispose();
+        }
+      }
       this.armMesh.material = this.createArmMaterial(skinName);
     }
   }
@@ -115,10 +122,22 @@ export class ViewModel {
     if (this.currentHeldId === id) return;
     this.currentHeldId = id;
 
-    // Clear old held mesh
+    // Clear old held mesh and recursively dispose geometries & materials
     while (this.heldItemContainer.children.length > 0) {
-      const child = this.heldItemContainer.children[0] as THREE.Mesh;
-      if (child.geometry) child.geometry.dispose();
+      const child = this.heldItemContainer.children[0];
+      child.traverse((node) => {
+        if ((node as THREE.Mesh).isMesh) {
+          const mesh = node as THREE.Mesh;
+          if (mesh.geometry) mesh.geometry.dispose();
+          if (mesh.material) {
+            if (Array.isArray(mesh.material)) {
+              mesh.material.forEach(m => m.dispose());
+            } else {
+              mesh.material.dispose();
+            }
+          }
+        }
+      });
       this.heldItemContainer.remove(child);
     }
 

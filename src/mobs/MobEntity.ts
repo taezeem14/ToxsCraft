@@ -700,6 +700,18 @@ export class MobEntity implements PhysicsEntity {
     }
 
     group.position.copy(this.position);
+    
+    // Clone materials so each mob instance has its own for color flashing
+    group.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        if (Array.isArray(child.material)) {
+          child.material = child.material.map(m => m.clone());
+        } else if (child.material) {
+          child.material = child.material.clone();
+        }
+      }
+    });
+
     return group;
   }
 
@@ -1114,11 +1126,6 @@ export class MobEntity implements PhysicsEntity {
     this.mesh.traverse((child) => {
       if (child instanceof THREE.Mesh) {
         child.geometry.dispose();
-        if (child.material instanceof Array) {
-          child.material.forEach(m => m.dispose());
-        } else {
-          child.material.dispose();
-        }
       }
     });
   }

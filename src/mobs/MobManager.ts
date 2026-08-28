@@ -32,6 +32,7 @@ export class MobManager {
       const arrow = this.arrows[i];
       arrow.update(deltaSec, player, chunkManager);
       if (arrow.isDead) {
+        arrow.destroy();
         this.arrows.splice(i, 1);
       }
     }
@@ -107,6 +108,10 @@ export class MobManager {
   // -------------------------------------------------------------
 
   public addMob(mob: MobEntity): void {
+    if (this.mobs.length >= this.maxMobs) {
+      mob.destroy(this.scene);
+      return;
+    }
     this.mobs.push(mob);
   }
 

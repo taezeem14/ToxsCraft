@@ -802,6 +802,7 @@ export class UIManager {
           else o2Str += '<span style="color: #444; opacity: 0.3">🫧</span>';
         }
         oxygenRow.innerHTML = o2Str;
+        oxygenRow.style.display = 'flex';
       } else {
         oxygenRow.classList.add('hidden');
         oxygenRow.style.display = 'none';
@@ -823,8 +824,10 @@ export class UIManager {
     // 4. 10 hunger drumsticks (20 points)
     let foodStr = '';
     const fullFood = Math.floor(this.game.player.hunger / 2);
+    const halfFood = this.game.player.hunger % 2 >= 1;
     for (let i = 0; i < 10; i++) {
       if (i < fullFood) foodStr += '<span style="color: #c9803b">🍖</span>';
+      else if (i === fullFood && halfFood) foodStr += '<span style="color: #c9803b; opacity:0.65">🍖</span>';
       else foodStr += '<span style="color: #444">🍖</span>';
     }
     hungerRow.innerHTML = foodStr;
@@ -1315,14 +1318,14 @@ export class UIManager {
     // Trigger toggle inventory key
     eventBus.on('keydown', (code: string) => {
       if (code === 'KeyE' && this.game.activeWorld && !this.game.isPaused && !this.game.player.isDead) {
-        const hidden = this.screens.inventoryScreen.classList.contains('hidden');
-        if (hidden) {
-          document.exitPointerLock();
-          this.screens.inventoryScreen.classList.remove('hidden');
-          this.activeScreen = this.screens.inventoryScreen;
-          this.drawInventorySlots();
+        if (this.activeScreen) {
+          this.hideAllScreens();
+          this.hudOverlay.classList.remove('hidden');
+          this.game.inputManager.requestLock();
         } else {
-          this.closeInventory();
+          document.exitPointerLock();
+          this.showScreen('inventoryScreen');
+          this.drawInventorySlots();
         }
       }
     });
@@ -1509,8 +1512,11 @@ export class UIManager {
         this.craftInput[cIdx] = this.heldItem;
         this.heldItem = null;
       } else if (current.id === this.heldItem.id) {
-        current.count += this.heldItem.count; // simplicity merge
-        this.heldItem = null;
+        const space = 64 - current.count;
+        const toAdd = Math.min(space, this.heldItem.count);
+        current.count += toAdd;
+        this.heldItem.count -= toAdd;
+        if (this.heldItem.count <= 0) this.heldItem = null;
       } else {
         const temp = current;
         this.craftInput[cIdx] = this.heldItem;
@@ -1698,8 +1704,11 @@ export class UIManager {
         this.craftInput3x3[cIdx] = this.heldItem;
         this.heldItem = null;
       } else if (current.id === this.heldItem.id) {
-        current.count += this.heldItem.count;
-        this.heldItem = null;
+        const space = 64 - current.count;
+        const toAdd = Math.min(space, this.heldItem.count);
+        current.count += toAdd;
+        this.heldItem.count -= toAdd;
+        if (this.heldItem.count <= 0) this.heldItem = null;
       } else {
         const temp = current;
         this.craftInput3x3[cIdx] = this.heldItem;
@@ -1937,8 +1946,11 @@ export class UIManager {
           this.furnaceInput = this.heldItem;
           this.heldItem = null;
         } else if (this.furnaceInput.id === this.heldItem.id) {
-          this.furnaceInput.count += this.heldItem.count;
-          this.heldItem = null;
+          const space = 64 - this.furnaceInput.count;
+          const toAdd = Math.min(space, this.heldItem.count);
+          this.furnaceInput.count += toAdd;
+          this.heldItem.count -= toAdd;
+          if (this.heldItem.count <= 0) this.heldItem = null;
         } else {
           const temp = this.furnaceInput;
           this.furnaceInput = this.heldItem;
@@ -1954,8 +1966,11 @@ export class UIManager {
           this.furnaceFuel = this.heldItem;
           this.heldItem = null;
         } else if (this.furnaceFuel.id === this.heldItem.id) {
-          this.furnaceFuel.count += this.heldItem.count;
-          this.heldItem = null;
+          const space = 64 - this.furnaceFuel.count;
+          const toAdd = Math.min(space, this.heldItem.count);
+          this.furnaceFuel.count += toAdd;
+          this.heldItem.count -= toAdd;
+          if (this.heldItem.count <= 0) this.heldItem = null;
         } else {
           const temp = this.furnaceFuel;
           this.furnaceFuel = this.heldItem;
@@ -1978,7 +1993,8 @@ export class UIManager {
       'cobblestone': 'stone',
       'sand': 'glass',
       'clay': 'terracotta',
-      'cooked_beef': 'cooked_beef'
+      'beef': 'cooked_beef',
+      'porkchop': 'cooked_porkchop'
     };
 
     if (!this.furnaceInput || !SMELT_RECIPES[this.furnaceInput.id]) {

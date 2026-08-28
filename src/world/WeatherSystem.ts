@@ -18,6 +18,7 @@ export class WeatherSystem {
 
   // Lightning system
   private lightningTimer = 0;
+  private nextLightningTime = 12.0;
   private isLightningActive = false;
   private lightningIntensity = 0;
 
@@ -26,6 +27,7 @@ export class WeatherSystem {
 
   constructor() {
     this.weatherDuration = 120 + Math.random() * 120;
+    this.nextLightningTime = 8.0 + Math.random() * 15.0;
   }
 
   public getWeather(): WeatherType {
@@ -88,8 +90,9 @@ export class WeatherSystem {
     // Lightning Flash Logic during thunderstorms
     if (this.currentWeather === 'thunder') {
       this.lightningTimer += deltaSec;
-      if (this.lightningTimer >= 8.0 + Math.random() * 15.0) {
+      if (this.lightningTimer >= this.nextLightningTime) {
         this.lightningTimer = 0;
+        this.nextLightningTime = 8.0 + Math.random() * 15.0;
         this.triggerLightning();
       }
     }

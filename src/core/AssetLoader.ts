@@ -8,12 +8,22 @@ import * as THREE from 'three';
 export class AssetLoader {
   private static textureAtlas: THREE.CanvasTexture | null = null;
   private static audioCtx: AudioContext | null = null;
+  private static prngSeed = 0x6d2b79f5;
+
+  private static seededRandom(): number {
+    let t = (this.prngSeed += 0x6d2b79f5);
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
 
   /**
    * Generates the entire 16x16 texture atlas on the fly
    */
   public static getTextureAtlas(): THREE.CanvasTexture {
     if (this.textureAtlas) return this.textureAtlas;
+
+    this.prngSeed = 0x6d2b79f5; // Reset seed for consistent texture atlas
 
     const tileSize = 16;
     const cols = 16;
@@ -27,8 +37,8 @@ export class AssetLoader {
     ctx.fillStyle = '#ff00ff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Generate each texture slot
-    for (let index = 0; index < 256; index++) {
+    // Generate each defined texture slot (up to 81)
+    for (let index = 0; index <= 81; index++) {
       const tx = (index % cols) * tileSize;
       const ty = Math.floor(index / cols) * tileSize;
       this.drawTexture(index, ctx, tx, ty);
@@ -49,6 +59,8 @@ export class AssetLoader {
    * Draw a specific 16x16 block texture based on index
    */
   private static drawTexture(index: number, ctx: CanvasRenderingContext2D, x: number, y: number): void {
+    const rand = () => this.seededRandom();
+
     // Helper to draw a pixel
     const pixel = (px: number, py: number, color: string) => {
       ctx.fillStyle = color;
@@ -61,13 +73,11 @@ export class AssetLoader {
       ctx.fillRect(x, y, 16, 16);
     };
 
-
-
     // Helper to add 2D grid noise
     const gridNoise = (r: number, g: number, b: number, variance = 15) => {
       for (let py = 0; py < 16; py++) {
         for (let px = 0; px < 16; px++) {
-          const v = (Math.random() - 0.5) * variance;
+          const v = (rand() - 0.5) * variance;
           ctx.fillStyle = `rgb(${Math.max(0, Math.min(255, r + v))}, ${Math.max(0, Math.min(255, g + v))}, ${Math.max(0, Math.min(255, b + v))})`;
           ctx.fillRect(x + px, y + py, 1, 1);
         }

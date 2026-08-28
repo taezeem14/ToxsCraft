@@ -27,6 +27,14 @@ import { MultiplayerManager } from './core/MultiplayerManager';
 import { WeatherSystem } from './world/WeatherSystem';
 import { TNTEntity } from './world/TNTEntity';
 
+// Reusable vectors to avoid per-frame allocations
+const _camOrigin = new THREE.Vector3();
+const _camDir = new THREE.Vector3();
+const _camDirNeg = new THREE.Vector3();
+const _camDirScaled = new THREE.Vector3();
+const _camPos = new THREE.Vector3();
+const _camLookAt = new THREE.Vector3();
+
 export function getBlockColorHex(blockId: number): number {
   switch (blockId) {
     case 1: case 19: return 0x7f8c8d; // Stone/Cobble
@@ -369,7 +377,7 @@ export class Game {
     // 2. Save active chunks
     const chunks = this.chunkManager.getActiveChunks();
     for (const chunk of chunks) {
-      if (chunk.isDirty || true) { // save all loadable blocks
+      if (chunk.isDirty) { // save modified chunks only
         const data = chunk.serialize();
         await WorldDatabase.saveChunk(this.activeWorld.id, chunk.x, chunk.z, data, this.chunkManager.currentDimension);
         chunk.isDirty = false;
@@ -782,30 +790,33 @@ export class Game {
 
     // Sync camera viewport coords to player eyes based on POV camera mode
     const eyeY = this.player.position.y + this.player.eyeHeight;
-    const origin = new THREE.Vector3(this.player.position.x, eyeY, this.player.position.z);
+    _camOrigin.set(this.player.position.x, eyeY, this.player.position.z);
 
     // Apply look yaw and pitch angles
-    const dir = new THREE.Vector3(
+    _camDir.set(
       Math.sin(this.player.yaw) * Math.cos(this.player.pitch),
       Math.sin(this.player.pitch),
       -Math.cos(this.player.yaw) * Math.cos(this.player.pitch)
     ).normalize();
 
     if (this.cameraMode === 'first') {
-      this.renderer.camera.position.copy(origin);
-      this.renderer.camera.lookAt(origin.clone().add(dir));
+      this.renderer.camera.position.copy(_camOrigin);
+      _camLookAt.copy(_camOrigin).add(_camDir);
+      this.renderer.camera.lookAt(_camLookAt);
     } else if (this.cameraMode === 'third_back') {
-      const backRay = Raycaster.cast(origin, dir.clone().negate(), 3.0, this.chunkManager);
+      _camDirNeg.copy(_camDir).negate();
+      const backRay = Raycaster.cast(_camOrigin, _camDirNeg, 3.0, this.chunkManager);
       const dist = backRay ? Math.max(0.4, backRay.distance - 0.2) : 3.0;
-      const camPos = origin.clone().sub(dir.clone().multiplyScalar(dist));
-      this.renderer.camera.position.copy(camPos);
-      this.renderer.camera.lookAt(origin.clone().add(dir.clone().multiplyScalar(5.0)));
+      _camPos.copy(_camOrigin).sub(_camDirScaled.copy(_camDir).multiplyScalar(dist));
+      this.renderer.camera.position.copy(_camPos);
+      _camLookAt.copy(_camOrigin).add(_camDirScaled.copy(_camDir).multiplyScalar(5.0));
+      this.renderer.camera.lookAt(_camLookAt);
     } else if (this.cameraMode === 'third_front') {
-      const frontRay = Raycaster.cast(origin, dir, 3.0, this.chunkManager);
+      const frontRay = Raycaster.cast(_camOrigin, _camDir, 3.0, this.chunkManager);
       const dist = frontRay ? Math.max(0.4, frontRay.distance - 0.2) : 3.0;
-      const camPos = origin.clone().add(dir.clone().multiplyScalar(dist));
-      this.renderer.camera.position.copy(camPos);
-      this.renderer.camera.lookAt(origin);
+      _camPos.copy(_camOrigin).add(_camDirScaled.copy(_camDir).multiplyScalar(dist));
+      this.renderer.camera.position.copy(_camPos);
+      this.renderer.camera.lookAt(_camOrigin);
     }
 
     // Update player model visual mesh in 3D scene (hidden in 1st person)

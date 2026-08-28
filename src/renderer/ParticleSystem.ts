@@ -6,6 +6,9 @@
 
 import * as THREE from 'three';
 
+const _tempVec = new THREE.Vector3();
+const _tempColor = new THREE.Color();
+
 export interface Particle {
   position: THREE.Vector3;
   velocity: THREE.Vector3;
@@ -84,12 +87,12 @@ export class ParticleSystem {
    * Spawn particle burst on block break with colors derived from block
    */
   public spawnBlockBreak(pos: THREE.Vector3, baseColorHex: string | number, count = 16): void {
-    const baseColor = new THREE.Color(baseColorHex);
+    _tempColor.set(baseColorHex as any);
 
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= this.maxParticles) break;
 
-      const pColor = baseColor.clone();
+      const pColor = _tempColor.clone();
       // Slight color jitter
       pColor.r = Math.max(0, Math.min(1, pColor.r + (Math.random() - 0.5) * 0.15));
       pColor.g = Math.max(0, Math.min(1, pColor.g + (Math.random() - 0.5) * 0.15));
@@ -145,7 +148,7 @@ export class ParticleSystem {
       );
 
       this.particles.push({
-        position: pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3)),
+        position: pos.clone().add(_tempVec.set((Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3, (Math.random() - 0.5) * 0.3)),
         velocity: vel,
         color: color,
         size: isCrit ? 0.22 : 0.14,
@@ -239,7 +242,7 @@ export class ParticleSystem {
       );
 
       this.particles.push({
-        position: pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2)),
+        position: pos.clone().add(_tempVec.set((Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2, (Math.random() - 0.5) * 0.2)),
         velocity: vel,
         color: baseColor.clone(),
         size: 0.08 + Math.random() * 0.05,
@@ -347,12 +350,14 @@ export class ParticleSystem {
     }
 
     // 2. Tick existing particles
-    for (let i = this.particles.length - 1; i >= 0; i--) {
+    let i = 0;
+    while (i < this.particles.length) {
       const p = this.particles[i];
       p.life += deltaSec;
 
       if (p.life >= p.maxLife) {
-        this.particles.splice(i, 1);
+        this.particles[i] = this.particles[this.particles.length - 1];
+        this.particles.pop();
         continue;
       }
 
@@ -367,8 +372,12 @@ export class ParticleSystem {
 
       // Precipitation culling below player feet
       if (p.isPrecipitation && playerPos && p.position.y < playerPos.y - 4.0) {
-        this.particles.splice(i, 1);
+        this.particles[i] = this.particles[this.particles.length - 1];
+        this.particles.pop();
+        continue;
       }
+      
+      i++;
     }
 
     // 3. Write data into GPU buffer attributes

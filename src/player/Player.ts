@@ -60,6 +60,7 @@ export class Player {
     this.hunger = 20.0;
     this.stamina = 20.0;
     this.oxygen = 20.0;
+    this.isUnderwater = false;
     this.isDead = false;
     this.velocity.set(0, 0, 0);
     eventBus.emit('player_status_change');
@@ -204,7 +205,7 @@ export class Player {
       const armor = this.getArmorPoints();
       // Minecraft formula: reduction = min(20, max(armor / 5, armor - damage / (2 + toughness / 4))) / 25
       const reduction = (armor * 0.04); // 4% reduction per armor point up to 80%
-      effectiveDamage = Math.max(1.0, amount * (1.0 - reduction));
+      effectiveDamage = Math.max(0.5, amount * (1.0 - reduction));
     }
 
     this.health = Math.max(0, this.health - effectiveDamage);

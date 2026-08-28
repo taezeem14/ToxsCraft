@@ -132,6 +132,8 @@ export class TNTEntity {
     this.isDead = true;
     scene.remove(this.mesh);
     this.mesh.geometry.dispose();
+    if (this.flashMat) this.flashMat.dispose();
+    if (this.standardMat) this.standardMat.dispose();
 
     const blastRadius = 4;
     const center = this.position.clone();
@@ -198,5 +200,7 @@ export class TNTEntity {
       scene.remove(this.mesh);
       this.mesh.geometry.dispose();
     }
+    if (this.flashMat) this.flashMat.dispose();
+    if (this.standardMat) this.standardMat.dispose();
   }
 }

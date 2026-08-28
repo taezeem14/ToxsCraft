@@ -17,6 +17,12 @@ import waterFragShader from './shaders/water.frag.glsl';
 import lavaVertShader from './shaders/lava.vert.glsl';
 import lavaFragShader from './shaders/lava.frag.glsl';
 
+const UNDERWATER_FOG_COLOR = new THREE.Color(0.04, 0.22, 0.42);
+const NETHER_FOG_COLOR = new THREE.Color(0.12, 0.03, 0.03);
+const STORM_FOG_COLOR = new THREE.Color(0.15, 0.17, 0.22);
+const LIGHTNING_FOG_COLOR = new THREE.Color(0.9, 0.95, 1.0);
+const SHADOW_OFFSET = new THREE.Vector3(50, 100, 30);
+
 export class Renderer {
   public canvas: HTMLCanvasElement;
   public renderer: THREE.WebGLRenderer;
@@ -101,10 +107,10 @@ export class Renderer {
     this.dirLight.shadow.mapSize.width = 1024;
     this.dirLight.shadow.mapSize.height = 1024;
     this.dirLight.shadow.camera.near = 0.5;
-    this.dirLight.shadow.camera.far = 500;
+    this.dirLight.shadow.camera.far = 200;
     
     // Keep shadow volume tight around active player zone
-    const d = 120;
+    const d = 40;
     this.dirLight.shadow.camera.left = -d;
     this.dirLight.shadow.camera.right = d;
     this.dirLight.shadow.camera.top = d;
@@ -138,7 +144,7 @@ export class Renderer {
       vertexColors: true,
       depthWrite: true,
       transparent: false,
-      side: THREE.DoubleSide
+      side: THREE.FrontSide
     });
 
     // 2. Liquid Water material
@@ -327,32 +333,40 @@ export class Renderer {
     let fogColor: THREE.Color;
     let sunIntensity: number;
 
+    if (!this.scene.fog) {
+      this.scene.fog = new THREE.FogExp2(0xffffff, 0);
+    }
+    const fog = this.scene.fog as THREE.FogExp2;
+
     if (isUnderwater) {
-      fogColor = new THREE.Color(0.04, 0.22, 0.42); // Deep crystal underwater blue
-      this.scene.fog = new THREE.FogExp2(fogColor, 0.035);
+      fogColor = UNDERWATER_FOG_COLOR;
+      fog.color.copy(fogColor);
+      fog.density = 0.035;
       sunIntensity = 0.5;
     } else if (isNether) {
       this.skySystem.setDimension('nether');
-      fogColor = new THREE.Color(0.12, 0.03, 0.03); // Dark red Nether fog
-      this.scene.fog = new THREE.FogExp2(fogColor, 0.015); // High density cavern fog
+      fogColor = NETHER_FOG_COLOR;
+      fog.color.copy(fogColor);
+      fog.density = 0.015;
       sunIntensity = 0.45; // Constant base light level
     } else {
       this.skySystem.setDimension('overworld');
       // 1. Update Sky elements
       this.skySystem.update(timeOfDay, playerPos);
-      fogColor = this.skySystem.getFogColor();
+      fog.color.copy(this.skySystem.getFogColor());
       
       // Apply storm sky darkness
       if (skyDarkness > 0) {
-        fogColor.lerp(new THREE.Color(0.15, 0.17, 0.22), skyDarkness);
+        fog.color.lerp(STORM_FOG_COLOR, skyDarkness);
       }
 
       // Apply lightning flash to fog
       if (lightningIntensity > 0) {
-        fogColor.lerp(new THREE.Color(0.9, 0.95, 1.0), Math.min(1.0, lightningIntensity * 0.5));
+        fog.color.lerp(LIGHTNING_FOG_COLOR, Math.min(1.0, lightningIntensity * 0.5));
       }
 
-      this.scene.fog = new THREE.FogExp2(fogColor, 0.0035 + skyDarkness * 0.002);
+      fogColor = fog.color;
+      fog.density = 0.0035 + skyDarkness * 0.002;
       sunIntensity = Math.max(0.05, this.skySystem.getSunlightIntensity() * (1.0 - skyDarkness * 0.6) + lightningIntensity * 1.5);
     }
 
@@ -374,7 +388,7 @@ export class Renderer {
 
     if (!isNether) {
       // Center shadow frustum on player to save draw calls
-      this.dirLight.shadow.camera.position.copy(playerPos).add(new THREE.Vector3(50, 100, 30));
+      this.dirLight.shadow.camera.position.copy(playerPos).add(SHADOW_OFFSET);
       this.dirLight.shadow.camera.lookAt(playerPos);
     }
 

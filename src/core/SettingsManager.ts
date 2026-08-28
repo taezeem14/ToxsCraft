@@ -19,7 +19,7 @@ export interface GameSettings {
   skin: string;
 }
 
-function detectSoftwareRenderer(): boolean {
+function detectLowEndGPU(): boolean {
   try {
     const canvas = document.createElement('canvas');
     const gl = (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')) as WebGLRenderingContext | null;
@@ -33,6 +33,12 @@ function detectSoftwareRenderer(): boolean {
         renderer.includes('swiftshader') ||
         renderer.includes('llvmpipe') ||
         renderer.includes('basic render') ||
+        renderer.includes('intel hd') ||
+        renderer.includes('intel(r) hd') ||
+        renderer.includes('intel(r) uhd') ||
+        renderer.includes('intel iris') ||
+        renderer.includes('mali') ||
+        renderer.includes('adreno') ||
         vendor.includes('swiftshader')
       );
     }
@@ -42,12 +48,12 @@ function detectSoftwareRenderer(): boolean {
   return false;
 }
 
-const isSoftware = detectSoftwareRenderer();
+const isLowEnd = detectLowEndGPU();
 const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || ('ontouchstart' in window);
 
 const DEFAULT_SETTINGS: GameSettings = {
   fov: 75,
-  renderDistance: isSoftware ? 2 : (isMobileDevice ? 3 : 4),
+  renderDistance: isLowEnd ? 3 : (isMobileDevice ? 3 : 4),
   mouseSensitivity: 0.002,
   volumeMaster: 0.8,
   volumeMusic: 0.5,
@@ -101,8 +107,8 @@ class SettingsManager {
         this.settings = { ...DEFAULT_SETTINGS, ...parsed };
         
         // Auto-optimize render distance for low-end / software devices on load
-        if (isSoftware && this.settings.renderDistance > 3) {
-          this.settings.renderDistance = 2;
+        if (isLowEnd && this.settings.renderDistance > 3) {
+          this.settings.renderDistance = 3;
         } else if (isMobileDevice && this.settings.renderDistance > 4) {
           this.settings.renderDistance = 3;
         }
